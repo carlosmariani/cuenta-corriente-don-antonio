@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1b5e20">
+<title>Cuenta Corriente — Don Antonio</title>
+<style>
+  :root{--verde:#1b5e20;--verde2:#2e7d32;--verde-claro:#e8f5e9;--rojo:#c62828;--gris:#5f6368;--linea:#e6e6e6;--bg:#f4f6f4;--card:#fff;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#1a1a1a}
+  body{padding-bottom:74px}
+  header{position:sticky;top:0;z-index:10;background:var(--verde);color:#fff;padding:12px 16px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  header h1{margin:0;font-size:16px;font-weight:600}
+  header .sub{font-size:12px;opacity:.85;margin-top:2px}
+  .wrap{padding:14px;max-width:680px;margin:0 auto}
+  .card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .totbox{background:linear-gradient(135deg,var(--verde),var(--verde2));color:#fff;border-radius:14px;padding:18px;margin-bottom:14px;text-align:center}
+  .totbox .lbl{font-size:13px;opacity:.9}.totbox .val{font-size:30px;font-weight:700;margin-top:4px}.totbox .pesos{font-size:14px;opacity:.9;margin-top:4px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--linea);cursor:pointer}
+  .row:last-child{border-bottom:none}
+  .row .nm{font-size:15px;font-weight:600}.row .ref{font-size:12px;color:var(--gris);margin-top:1px}
+  .row .amt{font-size:16px;font-weight:700;text-align:right;white-space:nowrap}
+  .amt.pos{color:var(--rojo)}.amt.zero{color:var(--verde2)}
+  .row .amt small{display:block;font-size:11px;color:var(--gris);font-weight:500}
+  .row .chev{color:#bbb;margin-left:6px;font-size:18px}
+  label{display:block;font-size:13px;color:var(--gris);margin:10px 0 4px;font-weight:600}
+  input,select,textarea{width:100%;padding:13px;border:1.5px solid var(--linea);border-radius:10px;font-size:16px;background:#fff;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--verde2)}
+  .btn{display:block;width:100%;padding:15px;border:none;border-radius:12px;background:var(--verde);color:#fff;font-size:16px;font-weight:700;margin-top:16px;cursor:pointer}
+  .btn:active{background:var(--verde2)}.btn.gray{background:#eceff1;color:#333}
+  h2.tt{font-size:18px;margin:4px 0 14px}
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--verde);font-weight:600;font-size:14px;cursor:pointer;margin-bottom:10px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--verde-claro);color:var(--verde)}
+  .pill.warn{background:#fff3e0;color:#e65100}
+  .muted{color:var(--gris);font-size:13px}
+  .seg{display:flex;gap:8px;margin-top:4px}
+  .seg button{flex:1;padding:11px;border:1.5px solid var(--linea);background:#fff;border-radius:10px;font-size:15px;font-weight:600;color:var(--gris);cursor:pointer}
+  .seg button.on{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
+  nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--linea);display:flex;z-index:20;box-shadow:0 -1px 6px rgba(0,0,0,.06)}
+  nav button{flex:1;border:none;background:none;padding:9px 2px 7px;font-size:10.5px;color:var(--gris);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button .ic{font-size:20px;line-height:1}nav button.on{color:var(--verde)}
+  .hidden{display:none!important}
+  .toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;z-index:50;opacity:0;transition:opacity .25s;max-width:90%;text-align:center}
+  .toast.show{opacity:1}
+  .spin{text-align:center;padding:26px;color:var(--gris)}
+  .mov{padding:10px 2px;border-bottom:1px solid var(--linea)}
+  .mov .top{display:flex;justify-content:space-between}
+  .mov .cc{font-weight:600;font-size:14px}.mov .mt{font-weight:700;font-size:14px}
+  .mov .mt.v{color:var(--rojo)}.mov .mt.p{color:var(--verde2)}
+  .mov .dt{font-size:12px;color:var(--gris);margin-top:2px}
+  #reciboView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
+  #reciboView.show{display:flex}
+  .recibo{background:#fff;width:100%;max-width:520px;border-radius:12px;padding:26px;margin:auto;position:relative}
+  .recibo h3{margin:0;font-size:19px;color:var(--verde)}.recibo .emp{font-size:12px;color:var(--gris)}
+  .recibo .nro{position:absolute;top:22px;right:26px;text-align:right}.recibo .nro b{color:var(--rojo);font-size:17px}
+  .recibo hr{border:none;border-top:1px solid var(--linea);margin:14px 0}
+  .recibo .ln{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}.recibo .ln .k{color:var(--gris)}
+  .recibo .big{font-size:22px;font-weight:700;text-align:center;background:var(--verde-claro);border-radius:10px;padding:14px;margin:12px 0}
+  .recibo .firma{margin-top:32px;text-align:center;font-size:12px;color:var(--gris)}.recibo .firma .lna{border-top:1px solid #999;width:60%;margin:30px auto 4px}
+  @media print{body *{visibility:hidden}#reciboView,#reciboView *{visibility:visible}#reciboView{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
+</style>
+</head>
+<body>
+<header><h1>Cuenta Corriente</h1><div class="sub">Semillería Don Antonio · Agencias de Desarrollo</div></header>
+
+<div class="wrap">
+  <!-- SALDOS -->
+  <section id="tab-saldos">
+    <div class="totbox">
+      <div class="lbl">Cuenta Madre — total a cobrar</div>
+      <div class="val" id="totUsd">—</div>
+      <div class="pesos" id="totPesos"></div>
+    </div>
+    <div class="card" style="display:flex;align-items:center;gap:10px">
+      <label style="margin:0;flex:1">Tipo de cambio (U$S 1 = $)</label>
+      <input id="tc" type="text" inputmode="decimal" style="width:120px">
+    </div>
+    <div class="card">
+      <div id="drill"></div>
+    </div>
+  </section>
+
+  <!-- VENTA -->
+  <section id="tab-venta" class="hidden">
+    <div class="card">
+      <h2 class="tt">Cargar venta</h2>
+      <label>Fecha</label><input id="v-fecha" type="date">
+      <label>Cooperativa / cuenta</label><select id="v-coop"></select>
+      <label>Socio</label><select id="v-prod"></select>
+      <label>Producto / concepto</label><input id="v-concepto" placeholder="Ej: Tomate Mataco x1M (10)">
+      <label>Monto U$S</label><input id="v-monto" type="text" inputmode="decimal" placeholder="0,00">
+      <label>N° comprobante (opcional)</label><input id="v-nro">
+      <button class="btn" onclick="guardarVenta()">Guardar venta</button>
+    </div>
+  </section>
+
+  <!-- PAGO -->
+  <section id="tab-pago" class="hidden">
+    <div class="card">
+      <h2 class="tt">Cargar pago</h2>
+      <label>Fecha</label><input id="p-fecha" type="date">
+      <label>Cooperativa / cuenta</label><select id="p-coop"></select>
+      <label>Socio</label><select id="p-prod"></select>
+      <div class="muted" id="p-saldo" style="margin-top:6px"></div>
+      <label>Moneda del pago</label>
+      <div class="seg"><button id="seg-ars" class="on" onclick="setMoneda('ARS')">Pesos $</button><button id="seg-usd" onclick="setMoneda('USD')">Dólares U$S</button></div>
+
+      <label>Forma de pago</label>
+      <div class="seg" style="flex-wrap:wrap">
+        <button id="met-efectivo" class="on" onclick="setMetodo('Efectivo')">💵 Efectivo</button>
+        <button id="met-transferencia" onclick="setMetodo('Transferencia')">📲 Transfer.</button>
+        <button id="met-cheque" onclick="setMetodo('Cheque')">🧾 Cheque</button>
+        <button id="met-mixto" onclick="setMetodo('Mixto')">🔀 Mixto</button>
+      </div>
+
+      <div id="amt-single">
+        <label>Monto recibido <span class="curlbl"></span></label>
+        <input id="p-monto" type="text" inputmode="decimal" placeholder="0" oninput="calcUsd()">
+      </div>
+      <div id="amt-mixto" class="hidden">
+        <label>💵 Parte en efectivo <span class="curlbl"></span></label>
+        <input id="p-ef" type="text" inputmode="decimal" placeholder="0" oninput="calcUsd()">
+        <label>📲 Parte transferencia / cheque <span class="curlbl"></span></label>
+        <input id="p-tr" type="text" inputmode="decimal" placeholder="0" oninput="calcUsd()">
+      </div>
+
+      <div id="tc-box">
+        <label>Tipo de cambio del día (U$S 1 = $)</label>
+        <input id="p-tc" type="text" inputmode="decimal" oninput="calcUsd()">
+      </div>
+      <div class="muted" id="p-equiv" style="margin-top:8px"></div>
+
+      <div id="box-comprob" class="hidden">
+        <label id="lbl-comprob">Adjuntar comprobante(s) (foto o PDF — podés elegir varios)</label>
+        <input id="p-archivo" type="file" accept="image/*,application/pdf" multiple style="padding:9px">
+      </div>
+      <label>Concepto</label><input id="p-concepto" placeholder="Pago a cuenta">
+      <label>N° de recibo</label><input id="p-nro" placeholder="automático">
+      <button class="btn" onclick="guardarPago()">Guardar pago y generar recibo</button>
+    </div>
+  </section>
+
+  <!-- RECIBOS -->
+  <section id="tab-recibos" class="hidden">
+    <div class="card"><h2 class="tt">Recibos emitidos</h2><div id="listaRecibos"><div class="spin">Cargando…</div></div></div>
+  </section>
+
+  <!-- CONCILIAR -->
+  <section id="tab-conciliar" class="hidden">
+    <div class="card"><h2 class="tt">A conciliar</h2><div id="listaConciliar"><div class="spin">Cargando…</div></div></div>
+  </section>
+</div>
+
+<nav>
+  <button data-tab="saldos" class="on" onclick="go('saldos')"><span class="ic">💰</span>Saldos</button>
+  <button data-tab="venta" onclick="go('venta')"><span class="ic">🛒</span>Venta</button>
+  <button data-tab="pago" onclick="go('pago')"><span class="ic">✓</span>Pago</button>
+  <button data-tab="recibos" onclick="go('recibos')"><span class="ic">🧾</span>Recibos</button>
+  <button data-tab="conciliar" onclick="go('conciliar')"><span class="ic">⚠️</span>Conciliar</button>
+</nav>
+
+<div id="reciboView">
+  <div class="recibo">
+    <div class="nro"><div class="emp">RECIBO N°</div><b id="r-nro"></b></div>
+    <h3 id="r-emp">Semillería Don Antonio S.R.L.</h3>
+    <div class="emp" id="r-cliente"></div>
+    <hr>
+    <div class="ln"><span class="k">Fecha</span><span id="r-fecha"></span></div>
+    <div class="ln"><span class="k">Recibí de</span><span id="r-de"></span></div>
+    <div class="ln"><span class="k">Sub-cuenta</span><span id="r-coop"></span></div>
+    <div class="big" id="r-monto"></div>
+    <div class="ln" id="r-ln-pesos"><span class="k">Pagado</span><span id="r-pesos"></span></div>
+    <div class="ln"><span class="k">Forma de pago</span><span id="r-metodo"></span></div>
+    <div class="ln"><span class="k">Concepto</span><span id="r-concepto"></span></div>
+    <div class="ln" id="r-ln-comprob"><span class="k">Comprobante</span><span><a id="r-comprob" href="#" target="_blank">Ver adjunto</a></span></div>
+    <div id="r-comprob-img" style="text-align:center;margin:6px 0"></div>
+    <hr>
+    <div class="ln"><span class="k">Saldo restante del socio</span><span id="r-saldo"></span></div>
+    <div class="firma"><div class="lna"></div>Firma y aclaración</div>
+    <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn gray" style="margin:0" onclick="cerrarRecibo()">Cerrar</button>
+      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL='https://sonrgnxebopeloamwntj.supabase.co';
+const SB_KEY='sb_publishable_jHAQp3l9fncT-MQaA4T_Vw_s9z76IcR';
+const db=supabase.createClient(SB_URL,SB_KEY);
+let COOPS=[],CFG={},TC=1000,MONEDA='ARS',METODO='Efectivo';
+const fmtUSD=n=>'U$S '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtARS=n=>'$ '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
+const hoy=()=>new Date().toISOString().slice(0,10);
+function parseMonto(v){
+  if(v==null)return NaN; let s=String(v).trim().replace(/\s|U\$S|\$/g,'');
+  if(!s)return NaN;
+  const c=s.includes(','), d=s.includes('.');
+  if(c&&d){ s = s.lastIndexOf(',')>s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,''); }
+  else if(c){ s=s.replace(/\./g,'').replace(',','.'); }
+  else if(d){ const p=s.split('.'); if(p.length>2 || p[p.length-1].length===3) s=s.replace(/\./g,''); }
+  return parseFloat(s);
+}
+const elNum=id=>parseMonto(document.getElementById(id).value);
+const cls=v=>Math.abs(v)<0.01?'zero':(v>0?'pos':'');
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+function go(tab){
+  ['saldos','venta','pago','recibos','conciliar'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
+    document.querySelector(`nav button[data-tab="${t}"]`).classList.toggle('on',t===tab);
+  });
+  if(tab==='saldos')verCoops();
+  if(tab==='pago')cargarProdPago();
+  if(tab==='venta')cargarProdVenta();
+  if(tab==='recibos')cargarRecibos();
+  if(tab==='conciliar')cargarConciliar();
+  window.scrollTo(0,0);
+}
+
+async function init(){
+  document.getElementById('v-fecha').value=hoy();
+  document.getElementById('p-fecha').value=hoy();
+  const {data:cfg}=await db.from('cc_config').select('*');(cfg||[]).forEach(r=>CFG[r.clave]=r.valor);
+  TC=parseFloat(CFG.tipo_cambio||'1000')||1000;
+  document.getElementById('tc').value=TC; document.getElementById('p-tc').value=TC;
+  if(CFG.empresa_cliente)document.getElementById('r-cliente').textContent='Cliente: '+CFG.empresa_cliente;
+  const {data:coops}=await db.from('cc_cooperativas').select('*').order('nombre');COOPS=coops||[];
+  const opts=COOPS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  document.getElementById('v-coop').innerHTML=opts;
+  document.getElementById('p-coop').innerHTML=opts;
+  document.getElementById('v-coop').addEventListener('change',cargarProdVenta);
+  document.getElementById('p-coop').addEventListener('change',cargarProdPago);
+  document.getElementById('p-prod').addEventListener('change',saldoProdPago);
+  setMoneda('ARS');setMetodo('Efectivo');
+  verCoops();
+}
+document.getElementById('tc').addEventListener('input',e=>{TC=parseMonto(e.target.value)||0;verCoops();db.from('cc_config').update({valor:String(TC)}).eq('clave','tipo_cambio');});
+
+// ---------- SALDOS drill ----------
+async function verCoops(){
+  const {data}=await db.from('cc_saldos').select('*');
+  const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
+  const tot=list.reduce((a,s)=>a+Number(s.saldo_usd),0);
+  document.getElementById('totUsd').textContent=fmtUSD(tot);
+  document.getElementById('totPesos').textContent='≈ '+fmtARS(tot*TC);
+  let h='<div class="muted" style="margin-bottom:8px">Tocá una cooperativa para ver sus socios</div>';
+  h+=list.map(s=>`<div class="row" onclick="verSocios(${s.cooperativa_id},'${(s.nombre||'').replace(/'/g,"\\'")}')">
+    <div><div class="nm">${s.nombre}</div><div class="ref">${s.referente?s.referente+' · ':''}${s.tipo}</div></div>
+    <div style="display:flex;align-items:center"><div class="amt ${cls(s.saldo_usd)}">${fmtUSD(s.saldo_usd)}<small>${fmtARS(s.saldo_usd*TC)}</small></div><span class="chev">›</span></div></div>`).join('');
+  document.getElementById('drill').innerHTML=h;
+}
+async function verSocios(coopId,nombre){
+  const {data}=await db.from('cc_saldos_socio').select('*').eq('cooperativa_id',coopId);
+  const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
+  let h=`<div class="back" onclick="verCoops()">‹ Volver</div><h2 class="tt">${nombre}</h2>`;
+  if(!list.length)h+='<div class="muted">Sin socios cargados.</div>';
+  h+=list.map(s=>`<div class="row" onclick="verSocio(${s.productor_id},'${(s.apellido+', '+(s.nombre||'')).replace(/'/g,"\\'")}','${nombre.replace(/'/g,"\\'")}')">
+    <div><div class="nm">${s.apellido}, ${s.nombre||''}</div><div class="ref">${s.dni?'DNI '+s.dni:''}</div></div>
+    <div style="display:flex;align-items:center"><div class="amt ${cls(s.saldo_usd)}">${fmtUSD(s.saldo_usd)}<small>${fmtARS(s.saldo_usd*TC)}</small></div><span class="chev">›</span></div></div>`).join('');
+  document.getElementById('drill').innerHTML=h;
+}
+async function verSocio(prodId,nombre,coop){
+  const {data}=await db.from('cc_movimientos').select('*').eq('productor_id',prodId).order('fecha').order('id');
+  const movs=data||[];
+  const saldo=movs.reduce((a,m)=>a+(m.tipo==='venta'?Number(m.monto_usd):-Number(m.monto_usd)),0);
+  let h=`<div class="back" onclick="document.querySelector('#drill .back')&&verCoopsKeep()">‹</div>`;
+  h=`<div class="back" onclick="reabrirSocios('${coop.replace(/'/g,"\\'")}')">‹ Volver</div><h2 class="tt">${nombre}</h2>`;
+  h+=`<div class="totbox" style="margin-bottom:12px"><div class="lbl">Saldo del socio</div><div class="val" style="font-size:24px">${fmtUSD(saldo)}</div><div class="pesos">≈ ${fmtARS(saldo*TC)}</div></div>`;
+  if(Math.abs(saldo)>=0.01 && Math.abs(saldo)<=50)
+    h+=`<button class="btn gray" style="margin:0 0 12px" onclick="conciliarSocio(${prodId},'${coop.replace(/'/g,"\\'")}',${saldo})">⚖️ Dejar en cero (ajuste por redondeo)</button>`;
+  h+='<div class="muted" style="margin:6px 0">Detalle de lo que llevó y pagos</div>';
+  h+=movs.map(m=>{
+    const det=m.tipo==='venta'?(m.obs||''):((m.metodo||'Pago')+(m.moneda==='ARS'?' · $'+Number(m.monto_orig||0).toLocaleString('es-AR')+' @ TC '+m.tc:''));
+    const cu=(m.comprobantes_urls&&m.comprobantes_urls.length)?m.comprobantes_urls:(m.comprobante_url?[m.comprobante_url]:[]);
+    const comp=cu.length?' · '+cu.map((u,i)=>`<a href="${u}" target="_blank">comprob.${cu.length>1?i+1:''}</a>`).join(' '):'';
+    return `<div class="mov"><div class="top"><span class="cc">${m.tipo==='pago'?'🧾 '+(m.nro_comprobante||'Pago'):m.concepto}</span>
+    <span class="mt ${m.tipo==='venta'?'v':'p'}">${m.tipo==='venta'?'':'−'}${fmtUSD(m.monto_usd)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px">
+      <div class="dt">${det} · ${new Date(m.fecha+'T00:00').toLocaleDateString('es-AR')}${comp}</div>
+      <button class="btn gray" style="margin:0;padding:4px 10px;font-size:11px;width:auto;flex:none" onclick="anularMovimiento(${m.id},'${(m.concepto||m.tipo).replace(/'/g,"\\'")}',${prodId},'${nombre.replace(/'/g,"\\'")}','${coop.replace(/'/g,"\\'")}')">anular</button>
+    </div></div>`;}).join('');
+  document.getElementById('drill').innerHTML=h;
+}
+function reabrirSocios(coop){const c=COOPS.find(x=>x.nombre===coop);if(c)verSocios(c.id,coop);else verCoops();}
+async function conciliarSocio(prodId,coop,saldo){
+  const r=Math.round(saldo*100)/100;
+  if(!confirm(`¿Dejar la cuenta en cero? Se registra un ajuste por redondeo de ${fmtUSD(r)}.`))return;
+  const c=COOPS.find(x=>x.nombre===coop);
+  const {error}=await db.from('cc_movimientos').insert({fecha:hoy(),tipo:'ajuste',comprobante:'Ajuste',
+    cooperativa_id:c?c.id:null,productor_id:prodId,concepto:'Ajuste por redondeo',monto_usd:r,moneda:'USD',monto_orig:r,metodo:'Conciliación',conciliado:true});
+  if(error)return toast('Error: '+error.message);
+  toast('Cuenta conciliada a cero ✓'); reabrirSocios(coop);
+}
+async function anularMovimiento(id,desc,prodId,nombre,coop){
+  if(!confirm(`¿Anular "${desc}"? Se elimina el movimiento y el saldo del socio se recalcula.`))return;
+  const {error}=await db.from('cc_movimientos').delete().eq('id',id);
+  if(error)return toast('Error: '+error.message);
+  toast('Movimiento anulado'); verSocio(prodId,nombre,coop);
+}
+async function anularRecibo(id,nro){
+  if(!confirm(`¿Anular el recibo ${nro}? El pago se elimina y el saldo del socio vuelve a subir.`))return;
+  const {error}=await db.from('cc_movimientos').delete().eq('id',id);
+  if(error)return toast('Error: '+error.message);
+  toast('Recibo anulado'); cargarRecibos();
+}
+
+// ---------- selects venta/pago ----------
+async function llenarProd(coopSel,prodSel){
+  const cid=document.getElementById(coopSel).value;
+  const {data}=await db.from('cc_productores').select('*').eq('cooperativa_id',cid).order('apellido');
+  document.getElementById(prodSel).innerHTML=(data||[]).map(p=>`<option value="${p.id}">${p.apellido}, ${p.nombre||''}</option>`).join('')||'<option value="">(sin socios)</option>';
+}
+async function cargarProdVenta(){await llenarProd('v-coop','v-prod');}
+async function cargarProdPago(){await llenarProd('p-coop','p-prod');saldoProdPago();}
+async function saldoProdPago(){
+  const pid=document.getElementById('p-prod').value;if(!pid)return;
+  const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
+  const s=data?Number(data.saldo_usd):0;
+  document.getElementById('p-saldo').innerHTML=`Saldo del socio: <b>${fmtUSD(s)}</b> (≈ ${fmtARS(s*TC)})`;
+}
+function setMoneda(m){MONEDA=m;
+  document.getElementById('seg-ars').classList.toggle('on',m==='ARS');
+  document.getElementById('seg-usd').classList.toggle('on',m==='USD');
+  document.getElementById('tc-box').classList.toggle('hidden',m!=='ARS');
+  document.querySelectorAll('.curlbl').forEach(e=>e.textContent=m==='ARS'?'($)':'(U$S)');
+  calcUsd();
+}
+function setMetodo(m){METODO=m;
+  ['efectivo','transferencia','cheque','mixto'].forEach(x=>document.getElementById('met-'+x).classList.toggle('on',x===m.toLowerCase()));
+  document.getElementById('amt-single').classList.toggle('hidden',m==='Mixto');
+  document.getElementById('amt-mixto').classList.toggle('hidden',m!=='Mixto');
+  document.getElementById('box-comprob').classList.toggle('hidden',m==='Efectivo');
+  document.getElementById('lbl-comprob').textContent=(m==='Cheque'?'Adjuntar foto del cheque':'Adjuntar comprobante de transferencia')+' (foto o PDF)';
+  calcUsd();
+}
+function totalOrig(){
+  if(METODO==='Mixto')return (elNum('p-ef')||0)+(elNum('p-tr')||0);
+  return elNum('p-monto')||0;
+}
+function calcUsd(){
+  const t=totalOrig(), tc=elNum('p-tc')||0;
+  const u=MONEDA==='ARS'?(tc>0?t/tc:0):t;
+  document.getElementById('p-equiv').innerHTML=u>0?`Total imputado: <b>${fmtUSD(u)}</b>`:'';
+}
+
+async function guardarVenta(){
+  const pid=document.getElementById('v-prod').value, cid=document.getElementById('v-coop').value;
+  const monto=parseMonto(document.getElementById('v-monto').value);
+  if(!pid||!(monto>0))return toast('Falta socio o monto');
+  const {error}=await db.from('cc_movimientos').insert({fecha:document.getElementById('v-fecha').value||hoy(),
+    tipo:'venta',comprobante:'Venta',nro_comprobante:document.getElementById('v-nro').value||null,
+    cooperativa_id:cid,productor_id:pid,concepto:document.getElementById('v-concepto').value||'Venta',
+    monto_usd:monto,moneda:'USD',monto_orig:monto,conciliado:true});
+  if(error)return toast('Error: '+error.message);
+  toast('Venta guardada ✓');['v-concepto','v-monto','v-nro'].forEach(i=>document.getElementById(i).value='');
+}
+
+async function guardarPago(){
+  const pid=document.getElementById('p-prod').value, cid=document.getElementById('p-coop').value;
+  if(!pid)return toast('Elegí un socio');
+  const moneda=MONEDA, cur=moneda==='ARS'?'$':'U$S';
+  const monto_orig=totalOrig();
+  if(!(monto_orig>0))return toast('Cargá el monto');
+  let tc=null, monto_usd;
+  if(moneda==='ARS'){tc=elNum('p-tc');
+    if(!(tc>0))return toast('Cargá el tipo de cambio'); monto_usd=Math.round(monto_orig/tc*100)/100;}
+  else monto_usd=monto_orig;
+  // desglose mixto
+  let breakdown='';
+  if(METODO==='Mixto'){
+    const ef=elNum('p-ef')||0, tr=elNum('p-tr')||0;
+    breakdown=` (Efectivo ${cur} ${ef.toLocaleString('es-AR')} + Transf/cheque ${cur} ${tr.toLocaleString('es-AR')})`;
+  }
+  let nro=document.getElementById('p-nro').value.trim();
+  if(!nro){const n=parseInt(CFG.prox_recibo_nro||'1',10);nro='R-'+String(n).padStart(4,'0');
+    await db.from('cc_config').update({valor:String(n+1)}).eq('clave','prox_recibo_nro');CFG.prox_recibo_nro=String(n+1);}
+  const concepto=document.getElementById('p-concepto').value||'Pago a cuenta';
+  // subir comprobante si hay archivo
+  let comprobantes_urls=[];
+  const files=document.getElementById('p-archivo').files;
+  if(files&&files.length){
+    for(let i=0;i<files.length;i++){
+      const f=files[i];
+      if(f.size>10*1024*1024)return toast(`"${f.name}" supera 10 MB`);
+      toast(`Subiendo comprobante ${i+1}/${files.length}…`);
+      const ext=(f.name.split('.').pop()||'dat').toLowerCase();
+      const path=`${pid}/${Date.now()}_${i}_${nro.replace(/[^A-Za-z0-9-]/g,'')}.${ext}`;
+      const up=await db.storage.from('comprobantes').upload(path,f,{contentType:f.type||undefined,upsert:false});
+      if(up.error)return toast('Error al subir: '+up.error.message);
+      comprobantes_urls.push(db.storage.from('comprobantes').getPublicUrl(path).data.publicUrl);
+    }
+  }
+  const comprobante_url=comprobantes_urls[0]||null;
+  const metodoLabel=METODO+breakdown;
+  const {error}=await db.from('cc_movimientos').insert({fecha:document.getElementById('p-fecha').value||hoy(),
+    tipo:'pago',comprobante:'Recibo',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
+    concepto,monto_usd,moneda,monto_orig,tc,metodo:metodoLabel,comprobante_url,comprobantes_urls:comprobantes_urls.length?comprobantes_urls:null,conciliado:true});
+  if(error)return toast('Error: '+error.message);
+  const prod=document.getElementById('p-prod').selectedOptions[0].text;
+  const coop=COOPS.find(c=>c.id==cid);
+  const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
+  mostrarRecibo({nro,fecha:document.getElementById('p-fecha').value,de:prod,coop:coop?coop.nombre:'',
+    monto_usd,moneda,monto_orig,tc,concepto,metodo:metodoLabel,comprobantes:comprobantes_urls,saldo:data?Number(data.saldo_usd):0});
+  ['p-monto','p-ef','p-tr','p-concepto','p-nro'].forEach(i=>document.getElementById(i).value='');document.getElementById('p-equiv').innerHTML='';document.getElementById('p-archivo').value='';
+  saldoProdPago();
+}
+
+function mostrarRecibo(r){
+  document.getElementById('r-nro').textContent=r.nro;
+  document.getElementById('r-fecha').textContent=new Date(r.fecha+'T00:00').toLocaleDateString('es-AR');
+  document.getElementById('r-de').textContent=r.de;
+  document.getElementById('r-coop').textContent=r.coop;
+  document.getElementById('r-monto').textContent=fmtUSD(r.monto_usd);
+  const lp=document.getElementById('r-ln-pesos');
+  if(r.moneda==='ARS'){lp.style.display='';document.getElementById('r-pesos').textContent=fmtARS(r.monto_orig)+'  (TC '+r.tc+')';}
+  else lp.style.display='none';
+  document.getElementById('r-metodo').textContent=r.metodo||'Efectivo';
+  document.getElementById('r-concepto').textContent=r.concepto;
+  const lc=document.getElementById('r-ln-comprob'), img=document.getElementById('r-comprob-img');
+  const arr=(r.comprobantes&&r.comprobantes.length)?r.comprobantes:(r.comprobante_url?[r.comprobante_url]:[]);
+  lc.style.display='none';
+  if(arr.length){
+    let html=`<div style="font-size:12px;color:var(--gris);text-align:left;margin-top:8px;font-weight:600">Comprobante${arr.length>1?'s':''} de pago</div>`;
+    arr.forEach((u,i)=>{
+      if(/\.(jpe?g|png|webp|gif|bmp)(\?|$)/i.test(u))
+        html+=`<img src="${u}" alt="comprobante" style="width:100%;max-height:430px;object-fit:contain;border:1px solid #e0e0e0;border-radius:8px;margin-top:6px">`;
+      else html+=`<div style="margin-top:6px"><a href="${u}" target="_blank">Ver comprobante PDF ${arr.length>1?i+1:''}</a></div>`;
+    });
+    img.innerHTML=html;
+  }else img.innerHTML='';
+  document.getElementById('r-saldo').textContent=fmtUSD(r.saldo);
+  document.getElementById('reciboView').classList.add('show');
+}
+function cerrarRecibo(){document.getElementById('reciboView').classList.remove('show');}
+
+async function cargarRecibos(){
+  const {data}=await db.from('cc_movimientos').select('*,cc_cooperativas(nombre),cc_productores(apellido,nombre)').eq('tipo','pago').gt('monto_usd',0).order('fecha',{ascending:false}).order('id',{ascending:false});
+  const c=document.getElementById('listaRecibos');
+  if(!data||!data.length){c.innerHTML='<p class="muted">Todavía no hay recibos.</p>';return;}
+  c.innerHTML=data.map(m=>{const pr=m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):'';
+    return `<div class="mov">
+    <div class="top" onclick='reabrir(${JSON.stringify({nro:m.nro_comprobante,fecha:m.fecha,de:pr,coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||"",monto_usd:m.monto_usd,moneda:m.moneda,monto_orig:m.monto_orig,tc:m.tc,concepto:m.concepto,metodo:m.metodo,comprobante_url:m.comprobante_url,comprobantes:m.comprobantes_urls,pid:m.productor_id})})' style="cursor:pointer"><span class="cc">🧾 ${m.nro_comprobante||'s/n'}</span><span class="mt p">${fmtUSD(m.monto_usd)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="dt">${new Date(m.fecha+'T00:00').toLocaleDateString('es-AR')} · ${pr} · ${(m.cc_cooperativas&&m.cc_cooperativas.nombre)||''} · ${m.metodo||''}${(m.comprobantes_urls&&m.comprobantes_urls.length)?' 📎'+(m.comprobantes_urls.length>1?m.comprobantes_urls.length:''):(m.comprobante_url?' 📎':'')}</div>
+      <button class="btn gray" style="margin:0;padding:6px 12px;font-size:12px;width:auto;flex:none" onclick="anularRecibo(${m.id},'${m.nro_comprobante}')">Anular</button>
+    </div></div>`;}).join('');
+}
+async function reabrir(r){const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',r.pid).single();mostrarRecibo({...r,saldo:data?Number(data.saldo_usd):0});}
+
+async function cargarConciliar(){
+  const {data}=await db.from('cc_movimientos').select('*,cc_cooperativas(nombre)').eq('conciliado',false).order('fecha');
+  const c=document.getElementById('listaConciliar');
+  if(!data||!data.length){c.innerHTML='<p class="muted">✓ No hay items pendientes.</p>';return;}
+  c.innerHTML=data.map(m=>`<div class="mov"><div class="top"><span class="cc">${m.comprobante||m.tipo} ${m.nro_comprobante||''}</span><span class="pill warn">conciliar</span></div>
+    <div class="dt">${(m.cc_cooperativas&&m.cc_cooperativas.nombre)||''} · ${m.concepto||''}</div><div class="dt">${m.obs||''}</div></div>`).join('');
+}
+init();
+</script>
+</body>
+</html>
