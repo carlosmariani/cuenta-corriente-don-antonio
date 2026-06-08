@@ -115,7 +115,7 @@
       </div>
 
       <div id="amt-single">
-        <label>Monto recibido <span class="curlbl"></span></label>
+        <label><span id="lbl-monto">Monto recibido</span> <span class="curlbl"></span></label>
         <input id="p-monto" type="text" inputmode="decimal" placeholder="0" oninput="calcUsd()">
       </div>
       <div id="amt-mixto" class="hidden">
@@ -134,6 +134,16 @@
       <div id="box-comprob" class="hidden">
         <label id="lbl-comprob">Adjuntar comprobante(s) (foto o PDF — podés elegir varios)</label>
         <input id="p-archivo" type="file" accept="image/*,application/pdf" multiple style="padding:9px">
+      </div>
+      <div id="box-deposito" class="hidden">
+        <label>Gastos del depósito (no se devuelven): impuestos, percepciones, etc.</label>
+        <div id="items-list"></div>
+        <button type="button" class="btn gray" style="margin-top:8px;padding:10px" onclick="addItem()">+ Agregar concepto</button>
+        <div style="margin-top:12px;background:var(--verde-claro);border-radius:10px;padding:12px">
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:14px"><span class="muted">Total depositado</span><b id="dep-total">—</b></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:14px"><span class="muted">Gastos (no se devuelven)</span><b id="dep-gastos">—</b></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:15px"><span>A cuenta (se devuelve)</span><b id="dep-neto" style="color:var(--verde)">—</b></div>
+        </div>
       </div>
       <label>Concepto</label><input id="p-concepto" placeholder="Pago a cuenta">
       <label>N° de recibo</label><input id="p-nro" placeholder="automático">
@@ -170,6 +180,7 @@
     <div class="ln"><span class="k">Recibí de</span><span id="r-de"></span></div>
     <div class="ln"><span class="k">Sub-cuenta</span><span id="r-coop"></span></div>
     <div class="big" id="r-monto"></div>
+    <div id="r-deposito" style="display:none"></div>
     <div class="ln" id="r-ln-pesos"><span class="k">Pagado</span><span id="r-pesos"></span></div>
     <div class="ln"><span class="k">Forma de pago</span><span id="r-metodo"></span></div>
     <div class="ln"><span class="k">Concepto</span><span id="r-concepto"></span></div>
@@ -191,7 +202,7 @@
 const SB_URL='https://sonrgnxebopeloamwntj.supabase.co';
 const SB_KEY='sb_publishable_jHAQp3l9fncT-MQaA4T_Vw_s9z76IcR';
 const db=supabase.createClient(SB_URL,SB_KEY);
-let COOPS=[],CFG={},TC=1000,MONEDA='ARS',METODO='Efectivo';
+let COOPS=[],CFG={},TC=1000,MONEDA='ARS',METODO='Efectivo',DEPOSITO=false;
 const fmtUSD=n=>'U$S '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtARS=n=>'$ '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const hoy=()=>new Date().toISOString().slice(0,10);
@@ -277,12 +288,13 @@ async function verSocio(prodId,nombre,coop){
     const det=m.tipo==='venta'?(m.obs||''):((m.metodo||'Pago')+(m.moneda==='ARS'?' · $'+Number(m.monto_orig||0).toLocaleString('es-AR')+' @ TC '+m.tc:''));
     const cu=(m.comprobantes_urls&&m.comprobantes_urls.length)?m.comprobantes_urls:(m.comprobante_url?[m.comprobante_url]:[]);
     const comp=cu.length?' · '+cu.map((u,i)=>`<a href="${u}" target="_blank">comprob.${cu.length>1?i+1:''}</a>`).join(' '):'';
+    const itx=(m.items&&m.items.length)?'<div class="dt" style="margin-top:2px">Gastos: '+m.items.map(it=>it.concepto+' '+(m.moneda==='ARS'?'$':'U$S')+Number(it.monto).toLocaleString('es-AR')).join(' · ')+'</div>':'';
     return `<div class="mov"><div class="top"><span class="cc">${m.tipo==='pago'?'🧾 '+(m.nro_comprobante||'Pago'):m.concepto}</span>
     <span class="mt ${m.tipo==='venta'?'v':'p'}">${m.tipo==='venta'?'':'−'}${fmtUSD(m.monto_usd)}</span></div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px">
       <div class="dt">${det} · ${new Date(m.fecha+'T00:00').toLocaleDateString('es-AR')}${comp}</div>
       <button class="btn gray" style="margin:0;padding:4px 10px;font-size:11px;width:auto;flex:none" onclick="anularMovimiento(${m.id},'${(m.concepto||m.tipo).replace(/'/g,"\\'")}',${prodId},'${nombre.replace(/'/g,"\\'")}','${coop.replace(/'/g,"\\'")}')">anular</button>
-    </div></div>`;}).join('');
+    </div>${itx}</div>`;}).join('');
   document.getElementById('drill').innerHTML=h;
 }
 function reabrirSocios(coop){const c=COOPS.find(x=>x.nombre===coop);if(c)verSocios(c.id,coop);else verCoops();}
@@ -315,7 +327,32 @@ async function llenarProd(coopSel,prodSel){
   document.getElementById(prodSel).innerHTML=(data||[]).map(p=>`<option value="${p.id}">${p.apellido}, ${p.nombre||''}</option>`).join('')||'<option value="">(sin socios)</option>';
 }
 async function cargarProdVenta(){await llenarProd('v-coop','v-prod');}
-async function cargarProdPago(){await llenarProd('p-coop','p-prod');saldoProdPago();}
+async function cargarProdPago(){
+  await llenarProd('p-coop','p-prod');
+  const c=COOPS.find(x=>x.id==document.getElementById('p-coop').value);
+  DEPOSITO=!!(c&&c.tipo==='deposito');
+  document.getElementById('box-deposito').classList.toggle('hidden',!DEPOSITO);
+  document.getElementById('lbl-monto').textContent=DEPOSITO?'Total depositado / que ingresa':'Monto recibido';
+  document.getElementById('p-concepto').value=DEPOSITO?'Depósito en garantía':'';
+  if(DEPOSITO&&!document.querySelector('#items-list .item-row'))addItem();
+  calcUsd(); saldoProdPago();
+}
+function addItem(){
+  const row=document.createElement('div'); row.className='item-row';
+  row.style.cssText='display:flex;gap:6px;margin-top:6px';
+  row.innerHTML=`<input class="it-con" placeholder="Concepto (ej: Percepción IIBB)" style="flex:2">
+    <input class="it-mon" type="text" inputmode="decimal" placeholder="monto" style="flex:1" oninput="calcUsd()">
+    <button type="button" class="btn gray" style="margin:0;padding:0 12px;width:auto;flex:none" onclick="this.parentElement.remove();calcUsd()">✕</button>`;
+  document.getElementById('items-list').appendChild(row);
+}
+function collectGastos(){
+  const items=[]; let sum=0;
+  document.querySelectorAll('#items-list .item-row').forEach(r=>{
+    const con=r.querySelector('.it-con').value.trim(), m=parseMonto(r.querySelector('.it-mon').value)||0;
+    if(con||m>0){items.push({concepto:con||'Gasto',monto:Math.round(m*100)/100}); sum+=m;}
+  });
+  return {items, sum:Math.round(sum*100)/100};
+}
 async function saldoProdPago(){
   const pid=document.getElementById('p-prod').value;if(!pid)return;
   const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
@@ -342,8 +379,19 @@ function totalOrig(){
   return elNum('p-monto')||0;
 }
 function calcUsd(){
-  const t=totalOrig(), tc=elNum('p-tc')||0;
-  const u=MONEDA==='ARS'?(tc>0?t/tc:0):t;
+  const tc=elNum('p-tc')||0, total=totalOrig();
+  const cur=MONEDA==='ARS'?'$ ':'U$S ';
+  const f=n=>cur+(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(DEPOSITO){
+    const g=collectGastos().sum, neto=Math.max(total-g,0);
+    document.getElementById('dep-total').textContent=f(total);
+    document.getElementById('dep-gastos').textContent=f(g);
+    document.getElementById('dep-neto').textContent=f(neto);
+    const u=MONEDA==='ARS'?(tc>0?neto/tc:0):neto;
+    document.getElementById('p-equiv').innerHTML=u>0?`A cuenta (baja la Cuenta Madre): <b>${fmtUSD(u)}</b>`:'';
+    return;
+  }
+  const u=MONEDA==='ARS'?(tc>0?total/tc:0):total;
   document.getElementById('p-equiv').innerHTML=u>0?`Total imputado: <b>${fmtUSD(u)}</b>`:'';
 }
 
@@ -363,17 +411,20 @@ async function guardarPago(){
   const pid=document.getElementById('p-prod').value, cid=document.getElementById('p-coop').value;
   if(!pid)return toast('Elegí un socio');
   const moneda=MONEDA, cur=moneda==='ARS'?'$':'U$S';
-  const monto_orig=totalOrig();
-  if(!(monto_orig>0))return toast('Cargá el monto');
-  let tc=null, monto_usd;
-  if(moneda==='ARS'){tc=elNum('p-tc');
-    if(!(tc>0))return toast('Cargá el tipo de cambio'); monto_usd=Math.round(monto_orig/tc*100)/100;}
-  else monto_usd=monto_orig;
-  // desglose mixto
-  let breakdown='';
-  if(METODO==='Mixto'){
-    const ef=elNum('p-ef')||0, tr=elNum('p-tr')||0;
-    breakdown=` (Efectivo ${cur} ${ef.toLocaleString('es-AR')} + Transf/cheque ${cur} ${tr.toLocaleString('es-AR')})`;
+  const total=totalOrig();
+  if(!(total>0))return toast('Cargá el monto');
+  let tc=null, monto_usd, monto_orig=total, items=null, breakdown='', gastosTot=0, netoOrig=total;
+  if(moneda==='ARS'){tc=elNum('p-tc'); if(!(tc>0))return toast('Cargá el tipo de cambio');}
+  if(DEPOSITO){
+    const g=collectGastos(); gastosTot=g.sum; items=g.items.length?g.items:null;
+    netoOrig=Math.round((total-gastosTot)*100)/100;
+    if(netoOrig<0)return toast('Los gastos superan el total depositado');
+    monto_usd=moneda==='ARS'?Math.round(netoOrig/tc*100)/100:netoOrig;
+    breakdown=` (Total ${cur} ${total.toLocaleString('es-AR')} − gastos ${cur} ${gastosTot.toLocaleString('es-AR')})`;
+  }else{
+    monto_usd=moneda==='ARS'?Math.round(total/tc*100)/100:total;
+    if(METODO==='Mixto'){const ef=elNum('p-ef')||0, tr=elNum('p-tr')||0;
+      breakdown=` (Efectivo ${cur} ${ef.toLocaleString('es-AR')} + Transf/cheque ${cur} ${tr.toLocaleString('es-AR')})`;}
   }
   let nro=document.getElementById('p-nro').value.trim();
   if(!nro){const n=parseInt(CFG.prox_recibo_nro||'1',10);nro='R-'+String(n).padStart(4,'0');
@@ -398,14 +449,16 @@ async function guardarPago(){
   const metodoLabel=METODO+breakdown;
   const {error}=await db.from('cc_movimientos').insert({fecha:document.getElementById('p-fecha').value||hoy(),
     tipo:'pago',comprobante:'Recibo',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
-    concepto,monto_usd,moneda,monto_orig,tc,metodo:metodoLabel,comprobante_url,comprobantes_urls:comprobantes_urls.length?comprobantes_urls:null,conciliado:true});
+    concepto,monto_usd,moneda,monto_orig,tc,metodo:metodoLabel,comprobante_url,comprobantes_urls:comprobantes_urls.length?comprobantes_urls:null,items,conciliado:true});
   if(error)return toast('Error: '+error.message);
   const prod=document.getElementById('p-prod').selectedOptions[0].text;
   const coop=COOPS.find(c=>c.id==cid);
   const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
   mostrarRecibo({nro,fecha:document.getElementById('p-fecha').value,de:prod,coop:coop?coop.nombre:'',
-    monto_usd,moneda,monto_orig,tc,concepto,metodo:metodoLabel,comprobantes:comprobantes_urls,saldo:data?Number(data.saldo_usd):0});
+    monto_usd,moneda,monto_orig,tc,concepto,metodo:metodoLabel,comprobantes:comprobantes_urls,
+    deposito:DEPOSITO,total:DEPOSITO?total:null,gastos:DEPOSITO?gastosTot:null,neto:DEPOSITO?netoOrig:null,items,saldo:data?Number(data.saldo_usd):0});
   ['p-monto','p-ef','p-tr','p-concepto','p-nro'].forEach(i=>document.getElementById(i).value='');document.getElementById('p-equiv').innerHTML='';document.getElementById('p-archivo').value='';
+  document.getElementById('items-list').innerHTML='';if(DEPOSITO)addItem();
   saldoProdPago();
 }
 
@@ -415,9 +468,21 @@ function mostrarRecibo(r){
   document.getElementById('r-de').textContent=r.de;
   document.getElementById('r-coop').textContent=r.coop;
   document.getElementById('r-monto').textContent=fmtUSD(r.monto_usd);
-  const lp=document.getElementById('r-ln-pesos');
-  if(r.moneda==='ARS'){lp.style.display='';document.getElementById('r-pesos').textContent=fmtARS(r.monto_orig)+'  (TC '+r.tc+')';}
-  else lp.style.display='none';
+  const dep=document.getElementById('r-deposito'), lp=document.getElementById('r-ln-pesos');
+  if(r.deposito){
+    const cur=r.moneda==='ARS'?'$ ':'U$S ';
+    const f=n=>cur+(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    let h=`<div class="ln"><span class="k">Total depositado</span><span>${f(r.total)}${r.moneda==='ARS'?' (TC '+r.tc+')':''}</span></div>`;
+    if(r.items&&r.items.length){h+=`<div style="font-size:12px;color:var(--gris);margin-top:4px">Gastos (no se devuelven):</div>`;
+      r.items.forEach(it=>{h+=`<div class="ln" style="padding-left:10px"><span class="k">· ${it.concepto}</span><span>${f(it.monto)}</span></div>`;});}
+    h+=`<div class="ln"><span class="k">Total gastos</span><span>${f(r.gastos)}</span></div>`;
+    h+=`<div class="ln"><span class="k"><b>A cuenta (se devuelve)</b></span><span><b>${f(r.neto)}</b></span></div>`;
+    dep.innerHTML=h; dep.style.display=''; lp.style.display='none';
+  }else{
+    dep.style.display='none';
+    if(r.moneda==='ARS'){lp.style.display='';document.getElementById('r-pesos').textContent=fmtARS(r.monto_orig)+'  (TC '+r.tc+')';}
+    else lp.style.display='none';
+  }
   document.getElementById('r-metodo').textContent=r.metodo||'Efectivo';
   document.getElementById('r-concepto').textContent=r.concepto;
   const lc=document.getElementById('r-ln-comprob'), img=document.getElementById('r-comprob-img');
@@ -443,13 +508,17 @@ async function cargarRecibos(){
   if(!data||!data.length){c.innerHTML='<p class="muted">Todavía no hay recibos.</p>';return;}
   c.innerHTML=data.map(m=>{const pr=m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):'';
     return `<div class="mov">
-    <div class="top" onclick='reabrir(${JSON.stringify({nro:m.nro_comprobante,fecha:m.fecha,de:pr,coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||"",monto_usd:m.monto_usd,moneda:m.moneda,monto_orig:m.monto_orig,tc:m.tc,concepto:m.concepto,metodo:m.metodo,comprobante_url:m.comprobante_url,comprobantes:m.comprobantes_urls,pid:m.productor_id})})' style="cursor:pointer"><span class="cc">🧾 ${m.nro_comprobante||'s/n'}</span><span class="mt p">${fmtUSD(m.monto_usd)}</span></div>
+    <div class="top" onclick='reabrir(${JSON.stringify({nro:m.nro_comprobante,fecha:m.fecha,de:pr,coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||"",monto_usd:m.monto_usd,moneda:m.moneda,monto_orig:m.monto_orig,tc:m.tc,concepto:m.concepto,metodo:m.metodo,comprobante_url:m.comprobante_url,comprobantes:m.comprobantes_urls,items:m.items,pid:m.productor_id})})' style="cursor:pointer"><span class="cc">🧾 ${m.nro_comprobante||'s/n'}</span><span class="mt p">${fmtUSD(m.monto_usd)}</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div class="dt">${new Date(m.fecha+'T00:00').toLocaleDateString('es-AR')} · ${pr} · ${(m.cc_cooperativas&&m.cc_cooperativas.nombre)||''} · ${m.metodo||''}${(m.comprobantes_urls&&m.comprobantes_urls.length)?' 📎'+(m.comprobantes_urls.length>1?m.comprobantes_urls.length:''):(m.comprobante_url?' 📎':'')}</div>
       <button class="btn gray" style="margin:0;padding:6px 12px;font-size:12px;width:auto;flex:none" onclick="anularRecibo(${m.id},'${m.nro_comprobante}')">Anular</button>
     </div></div>`;}).join('');
 }
-async function reabrir(r){const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',r.pid).single();mostrarRecibo({...r,saldo:data?Number(data.saldo_usd):0});}
+async function reabrir(r){
+  if(r.items&&r.items.length){r.deposito=true;r.total=r.monto_orig;r.gastos=Math.round(r.items.reduce((a,i)=>a+Number(i.monto||0),0)*100)/100;r.neto=Math.round((r.total-r.gastos)*100)/100;}
+  const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',r.pid).single();
+  mostrarRecibo({...r,saldo:data?Number(data.saldo_usd):0});
+}
 
 async function cargarConciliar(){
   const {data}=await db.from('cc_movimientos').select('*,cc_cooperativas(nombre)').eq('conciliado',false).order('fecha');
