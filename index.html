@@ -87,9 +87,19 @@
       <h2 class="tt">Cargar venta</h2>
       <label>Fecha</label><input id="v-fecha" type="date">
       <label>Cooperativa / cuenta</label><select id="v-coop"></select>
+      <div id="v-newcoop" class="hidden">
+        <label>Nombre de la nueva cuenta / cliente</label><input id="v-coopname" placeholder="Ej: Coop. La Esperanza / Juan Pérez">
+      </div>
       <label>Socio</label><select id="v-prod"></select>
-      <label>Producto / concepto</label><input id="v-concepto" placeholder="Ej: Tomate Mataco x1M (10)">
-      <label>Monto U$S</label><input id="v-monto" type="text" inputmode="decimal" placeholder="0,00">
+      <div id="v-newprod" class="hidden">
+        <label>Apellido</label><input id="v-ap" placeholder="Apellido">
+        <label>Nombre</label><input id="v-no" placeholder="Nombre">
+        <label>DNI (opcional)</label><input id="v-dni" inputmode="numeric">
+      </div>
+      <label>Productos / ítems que se lleva</label>
+      <div id="v-items"></div>
+      <button type="button" class="btn gray" style="margin-top:8px;padding:10px" onclick="addVItem()">+ Agregar ítem</button>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:var(--verde-claro);border-radius:10px;font-size:15px"><span>Total venta</span><b id="v-total">U$S 0,00</b></div>
       <label>N° comprobante (opcional)</label><input id="v-nro">
       <button class="btn" onclick="guardarVenta()">Guardar venta</button>
     </div>
@@ -240,13 +250,13 @@ async function init(){
   document.getElementById('tc').value=TC; document.getElementById('p-tc').value=TC;
   if(CFG.empresa_cliente)document.getElementById('r-cliente').textContent='Cliente: '+CFG.empresa_cliente;
   const {data:coops}=await db.from('cc_cooperativas').select('*').order('nombre');COOPS=coops||[];
-  const opts=COOPS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
-  document.getElementById('v-coop').innerHTML=opts;
-  document.getElementById('p-coop').innerHTML=opts;
+  rebuildCoopSelects();
   document.getElementById('v-coop').addEventListener('change',cargarProdVenta);
+  document.getElementById('v-prod').addEventListener('change',toggleNewProd);
   document.getElementById('p-coop').addEventListener('change',cargarProdPago);
   document.getElementById('p-prod').addEventListener('change',saldoProdPago);
   setMoneda('ARS');setMetodo('Efectivo');
+  addVItem(); vTotal(); cargarProdVenta();
   verCoops();
 }
 document.getElementById('tc').addEventListener('input',e=>{TC=parseMonto(e.target.value)||0;verCoops();db.from('cc_config').update({valor:String(TC)}).eq('clave','tipo_cambio');});
@@ -326,7 +336,43 @@ async function llenarProd(coopSel,prodSel){
   const {data}=await db.from('cc_productores').select('*').eq('cooperativa_id',cid).order('apellido');
   document.getElementById(prodSel).innerHTML=(data||[]).map(p=>`<option value="${p.id}">${p.apellido}, ${p.nombre||''}</option>`).join('')||'<option value="">(sin socios)</option>';
 }
-async function cargarProdVenta(){await llenarProd('v-coop','v-prod');}
+function rebuildCoopSelects(){
+  const opts=COOPS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  document.getElementById('v-coop').innerHTML=opts+'<option value="__new__">➕ Nueva cuenta / cliente</option>';
+  document.getElementById('p-coop').innerHTML=opts;
+}
+async function cargarProdVenta(){
+  const isNew=document.getElementById('v-coop').value==='__new__';
+  document.getElementById('v-newcoop').classList.toggle('hidden',!isNew);
+  if(isNew){
+    document.getElementById('v-prod').innerHTML='<option value="__new__">➕ Nuevo socio</option>';
+  }else{
+    await llenarProd('v-coop','v-prod');
+    document.getElementById('v-prod').innerHTML+='<option value="__new__">➕ Nuevo socio</option>';
+  }
+  toggleNewProd();
+}
+function toggleNewProd(){
+  document.getElementById('v-newprod').classList.toggle('hidden',document.getElementById('v-prod').value!=='__new__');
+}
+function addVItem(){
+  const row=document.createElement('div'); row.className='vitem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px';
+  row.innerHTML=`<input class="vi-prod" placeholder="Producto / descripción" style="flex:2">
+    <input class="vi-cant" type="text" inputmode="decimal" placeholder="cant" style="flex:1" oninput="vTotal()">
+    <input class="vi-prec" type="text" inputmode="decimal" placeholder="precio" style="flex:1" oninput="vTotal()">
+    <button type="button" class="btn gray" style="margin:0;padding:0 12px;width:auto;flex:none" onclick="this.parentElement.remove();vTotal()">✕</button>`;
+  document.getElementById('v-items').appendChild(row);
+}
+function vItems(){
+  const items=[];
+  document.querySelectorAll('#v-items .vitem-row').forEach(r=>{
+    const prod=r.querySelector('.vi-prod').value.trim();
+    const cant=parseMonto(r.querySelector('.vi-cant').value)||0, prec=parseMonto(r.querySelector('.vi-prec').value)||0;
+    if(prod||cant||prec) items.push({prod,cant,prec,total:Math.round(cant*prec*100)/100});
+  });
+  return items;
+}
+function vTotal(){ document.getElementById('v-total').textContent=fmtUSD(vItems().reduce((a,i)=>a+i.total,0)); }
 async function cargarProdPago(){
   await llenarProd('p-coop','p-prod');
   const c=COOPS.find(x=>x.id==document.getElementById('p-coop').value);
@@ -396,15 +442,35 @@ function calcUsd(){
 }
 
 async function guardarVenta(){
-  const pid=document.getElementById('v-prod').value, cid=document.getElementById('v-coop').value;
-  const monto=parseMonto(document.getElementById('v-monto').value);
-  if(!pid||!(monto>0))return toast('Falta socio o monto');
-  const {error}=await db.from('cc_movimientos').insert({fecha:document.getElementById('v-fecha').value||hoy(),
-    tipo:'venta',comprobante:'Venta',nro_comprobante:document.getElementById('v-nro').value||null,
-    cooperativa_id:cid,productor_id:pid,concepto:document.getElementById('v-concepto').value||'Venta',
-    monto_usd:monto,moneda:'USD',monto_orig:monto,conciliado:true});
+  let cid=document.getElementById('v-coop').value;
+  if(cid==='__new__'){
+    const nm=document.getElementById('v-coopname').value.trim();
+    if(!nm)return toast('Poné el nombre de la nueva cuenta');
+    const {data,error}=await db.from('cc_cooperativas').insert({nombre:nm,tipo:'cliente'}).select('id').single();
+    if(error)return toast('Error al crear cuenta: '+error.message);
+    cid=data.id; COOPS.push({id:cid,nombre:nm,tipo:'cliente'}); COOPS.sort((a,b)=>a.nombre.localeCompare(b.nombre)); rebuildCoopSelects();
+  }
+  let pid=document.getElementById('v-prod').value;
+  if(pid==='__new__'){
+    const ap=document.getElementById('v-ap').value.trim(), no=document.getElementById('v-no').value.trim();
+    if(!ap&&!no)return toast('Poné el nombre del nuevo socio');
+    const dni=document.getElementById('v-dni').value.trim()||null;
+    const {data,error}=await db.from('cc_productores').insert({cooperativa_id:cid,apellido:ap||no,nombre:ap?no:'',dni}).select('id').single();
+    if(error)return toast('Error al crear socio: '+error.message);
+    pid=data.id;
+  }
+  if(!pid)return toast('Elegí o creá un socio');
+  const items=vItems().filter(i=>i.prod&&i.total>0);
+  if(!items.length)return toast('Cargá al menos un ítem (producto, cantidad y precio)');
+  const nro=document.getElementById('v-nro').value||null, fch=document.getElementById('v-fecha').value||hoy();
+  const rows=items.map(i=>({fecha:fch,tipo:'venta',comprobante:'Venta',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
+    concepto:i.prod,monto_usd:i.total,moneda:'USD',monto_orig:i.total,obs:(i.cant?i.cant+' u × U$S '+i.prec:''),conciliado:true}));
+  const {error}=await db.from('cc_movimientos').insert(rows);
   if(error)return toast('Error: '+error.message);
-  toast('Venta guardada ✓');['v-concepto','v-monto','v-nro'].forEach(i=>document.getElementById(i).value='');
+  toast(`Venta guardada ✓ (${rows.length} ítem${rows.length>1?'s':''})`);
+  document.getElementById('v-items').innerHTML=''; addVItem(); vTotal();
+  ['v-nro','v-coopname','v-ap','v-no','v-dni'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('v-coop').value=cid; await cargarProdVenta();
 }
 
 async function guardarPago(){
