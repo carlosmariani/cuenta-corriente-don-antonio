@@ -49,8 +49,8 @@
   .mov .cc{font-weight:600;font-size:14px}.mov .mt{font-weight:700;font-size:14px}
   .mov .mt.v{color:var(--rojo)}.mov .mt.p{color:var(--verde2)}
   .mov .dt{font-size:12px;color:var(--gris);margin-top:2px}
-  #reciboView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
-  #reciboView.show{display:flex}
+  #reciboView,#ventaView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
+  #reciboView.show,#ventaView.show{display:flex}
   .recibo{background:#fff;width:100%;max-width:520px;border-radius:12px;padding:26px;margin:auto;position:relative}
   .recibo h3{margin:0;font-size:19px;color:var(--verde)}.recibo .emp{font-size:12px;color:var(--gris)}
   .recibo .nro{position:absolute;top:22px;right:26px;text-align:right}.recibo .nro b{color:var(--rojo);font-size:17px}
@@ -58,7 +58,7 @@
   .recibo .ln{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}.recibo .ln .k{color:var(--gris)}
   .recibo .big{font-size:22px;font-weight:700;text-align:center;background:var(--verde-claro);border-radius:10px;padding:14px;margin:12px 0}
   .recibo .firma{margin-top:32px;text-align:center;font-size:12px;color:var(--gris)}.recibo .firma .lna{border-top:1px solid #999;width:60%;margin:30px auto 4px}
-  @media print{body *{visibility:hidden}#reciboView,#reciboView *{visibility:visible}#reciboView{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
+  @media print{body *{visibility:hidden}#reciboView.show,#reciboView.show *,#ventaView.show,#ventaView.show *{visibility:visible}#reciboView.show,#ventaView.show{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
 </style>
 </head>
 <body>
@@ -201,6 +201,28 @@
     <div class="firma"><div class="lna"></div>Firma y aclaración</div>
     <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
       <button class="btn gray" style="margin:0" onclick="cerrarRecibo()">Cerrar</button>
+      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+<div id="ventaView">
+  <div class="recibo">
+    <div class="nro"><div class="emp">COMPROBANTE N°</div><b id="cv-nro"></b></div>
+    <h3>Semillería Don Antonio S.R.L.</h3>
+    <div class="emp">Comprobante de venta / entrega de mercadería</div>
+    <hr>
+    <div class="ln"><span class="k">Fecha</span><span id="cv-fecha"></span></div>
+    <div class="ln"><span class="k">Cliente / socio</span><span id="cv-de"></span></div>
+    <div class="ln"><span class="k">Sub-cuenta</span><span id="cv-coop"></span></div>
+    <hr>
+    <div style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:2px">Detalle</div>
+    <div id="cv-items"></div>
+    <div class="big" id="cv-total"></div>
+    <hr>
+    <div class="ln"><span class="k">Saldo del socio</span><span id="cv-saldo"></span></div>
+    <div class="firma"><div class="lna"></div>Firma y aclaración (recibí conforme)</div>
+    <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn gray" style="margin:0" onclick="cerrarVenta()">Cerrar</button>
       <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
     </div>
   </div>
@@ -451,6 +473,7 @@ async function guardarVenta(){
     cid=data.id; COOPS.push({id:cid,nombre:nm,tipo:'cliente'}); COOPS.sort((a,b)=>a.nombre.localeCompare(b.nombre)); rebuildCoopSelects();
   }
   let pid=document.getElementById('v-prod').value;
+  let prodName=pid!=='__new__'?document.getElementById('v-prod').selectedOptions[0].text:'';
   if(pid==='__new__'){
     const ap=document.getElementById('v-ap').value.trim(), no=document.getElementById('v-no').value.trim();
     if(!ap&&!no)return toast('Poné el nombre del nuevo socio');
@@ -458,6 +481,7 @@ async function guardarVenta(){
     const {data,error}=await db.from('cc_productores').insert({cooperativa_id:cid,apellido:ap||no,nombre:ap?no:'',dni}).select('id').single();
     if(error)return toast('Error al crear socio: '+error.message);
     pid=data.id;
+    const apl=ap||no, nm2=ap?no:''; prodName=apl+(nm2?', '+nm2:'');
   }
   if(!pid)return toast('Elegí o creá un socio');
   const items=vItems().filter(i=>i.prod&&i.total>0);
@@ -468,10 +492,29 @@ async function guardarVenta(){
   const {error}=await db.from('cc_movimientos').insert(rows);
   if(error)return toast('Error: '+error.message);
   toast(`Venta guardada ✓ (${rows.length} ítem${rows.length>1?'s':''})`);
+  const coopName=(COOPS.find(c=>c.id==cid)||{}).nombre||'';
+  const totalV=items.reduce((a,i)=>a+i.total,0);
+  const {data:sd}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
+  mostrarComprobanteVenta({nro,fecha:fch,de:prodName,coop:coopName,items,total:totalV,saldo:sd?Number(sd.saldo_usd):0});
   document.getElementById('v-items').innerHTML=''; addVItem(); vTotal();
   ['v-nro','v-coopname','v-ap','v-no','v-dni'].forEach(i=>document.getElementById(i).value='');
   document.getElementById('v-coop').value=cid; await cargarProdVenta();
 }
+
+function mostrarComprobanteVenta(v){
+  document.getElementById('cv-nro').textContent=v.nro||'—';
+  document.getElementById('cv-fecha').textContent=new Date(v.fecha+'T00:00').toLocaleDateString('es-AR');
+  document.getElementById('cv-de').textContent=v.de;
+  document.getElementById('cv-coop').textContent=v.coop;
+  document.getElementById('cv-items').innerHTML=v.items.map(i=>{
+    const det=i.cant?`${i.cant} u × ${fmtUSD(i.prec)}`:'';
+    return `<div class="ln"><span class="k">${i.prod}${det?'<br><small style="color:#999">'+det+'</small>':''}</span><span>${fmtUSD(i.total)}</span></div>`;
+  }).join('');
+  document.getElementById('cv-total').textContent='Total venta: '+fmtUSD(v.total);
+  document.getElementById('cv-saldo').textContent=fmtUSD(v.saldo);
+  document.getElementById('ventaView').classList.add('show');
+}
+function cerrarVenta(){document.getElementById('ventaView').classList.remove('show');}
 
 async function guardarPago(){
   const pid=document.getElementById('p-prod').value, cid=document.getElementById('p-coop').value;
