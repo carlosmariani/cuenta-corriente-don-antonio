@@ -123,6 +123,9 @@
       <label>Cooperativa / cuenta</label><select id="p-coop"></select>
       <label>Socio</label><select id="p-prod"></select>
       <div class="muted" id="p-saldo" style="margin-top:6px"></div>
+      <label>Cancelar / imputar a una venta (opcional)</label>
+      <select id="p-venta" onchange="selVentaPago()"><option value="">— Pago general a cuenta —</option></select>
+      <div class="muted" id="p-venta-info" style="margin-top:4px"></div>
       <label>Moneda del pago</label>
       <div class="seg"><button id="seg-ars" class="on" onclick="setMoneda('ARS')">Pesos $</button><button id="seg-usd" onclick="setMoneda('USD')">Dólares U$S</button></div>
 
@@ -466,6 +469,36 @@ async function saldoProdPago(){
   const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
   const s=data?Number(data.saldo_usd):0;
   document.getElementById('p-saldo').innerHTML=`Saldo del socio: <b>${fmtUSD(s)}</b> (≈ ${fmtARS(s*TC)})`;
+  cargarVentasPago();
+}
+async function cargarVentasPago(){
+  const sel=document.getElementById('p-venta'); const info=document.getElementById('p-venta-info');
+  const pid=document.getElementById('p-prod').value;
+  sel.innerHTML='<option value="">— Pago general a cuenta —</option>'; info.textContent='';
+  if(!pid)return;
+  const {data}=await db.from('cc_movimientos').select('concepto,monto_usd,creado_en,fecha').eq('tipo','venta').eq('productor_id',pid).eq('cancelada',false).order('creado_en');
+  if(!data||!data.length)return;
+  const {data:pg}=await db.from('cc_movimientos').select('monto_usd,venta_ref').eq('tipo','pago').eq('productor_id',pid).not('venta_ref','is',null);
+  const imput={}; (pg||[]).forEach(p=>{ imput[p.venta_ref]=(imput[p.venta_ref]||0)+Number(p.monto_usd); });
+  const groups={},order=[];
+  data.forEach(m=>{ const k=m.creado_en; if(!groups[k]){groups[k]={fecha:m.fecha,total:0,items:[]};order.push(k);} groups[k].total+=Number(m.monto_usd); groups[k].items.push(m.concepto); });
+  order.forEach(k=>{
+    const g=groups[k], total=Math.round(g.total*100)/100, rem=Math.round((total-(imput[k]||0))*100)/100;
+    if(rem<=0.01)return;
+    const f=new Date(g.fecha+'T00:00').toLocaleDateString('es-AR'), it=g.items.join(', ').slice(0,40);
+    const o=document.createElement('option'); o.value=k; o.dataset.rem=rem; o.dataset.total=total; o.dataset.fecha=f;
+    o.textContent=`${f} · ${it} · resta ${fmtUSD(rem)}`; sel.appendChild(o);
+  });
+}
+function selVentaPago(){
+  const sel=document.getElementById('p-venta'), info=document.getElementById('p-venta-info');
+  if(!sel.value){ info.textContent=''; return; }
+  const o=sel.selectedOptions[0], rem=Number(o.dataset.rem), total=Number(o.dataset.total);
+  setMoneda('USD');
+  document.getElementById('p-monto').value=rem;
+  document.getElementById('p-concepto').value='Cancela venta del '+o.dataset.fecha;
+  info.innerHTML=`Resta de esta venta: <b>${fmtUSD(rem)}</b> (total ${fmtUSD(total)}). Si pagás el total se marca cancelada; si pagás menos, queda saldo sobre la venta.`;
+  calcUsd();
 }
 function setMoneda(m){MONEDA=m;
   document.getElementById('seg-ars').classList.toggle('on',m==='ARS');
@@ -617,10 +650,12 @@ async function cargarVentas(){
   const {data}=await db.from('cc_movimientos').select('*,cc_cooperativas(nombre),cc_productores(apellido,nombre,dni,dni_foto_url)').eq('tipo','venta').order('creado_en',{ascending:false}).order('id',{ascending:false});
   const c=document.getElementById('listaVentas');
   if(!data||!data.length){c.innerHTML='<p class="muted">Todavía no hay ventas.</p>';return;}
+  const {data:pg}=await db.from('cc_movimientos').select('monto_usd,venta_ref').eq('tipo','pago').not('venta_ref','is',null);
+  const imput={}; (pg||[]).forEach(p=>{ imput[p.venta_ref]=(imput[p.venta_ref]||0)+Number(p.monto_usd); });
   const groups=[],map={};
   data.forEach(m=>{
     const key=(m.creado_en||m.fecha)+'|'+m.productor_id;
-    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,
+    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,ref:m.creado_en,cancelada:m.cancelada,
       coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||'',
       de:m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):'',
       dni:m.cc_productores?m.cc_productores.dni:null,dni_foto:m.cc_productores?m.cc_productores.dni_foto_url:null,pagare:m.pagare,pagare_venc:m.pagare_venc,pagare_lugar:m.pagare_lugar,items:[],total:0}; groups.push(map[key]);}
@@ -630,8 +665,12 @@ async function cargarVentas(){
   c.innerHTML=groups.map(g=>{
     const j=JSON.stringify(g).replace(/'/g,'&#39;');
     const itx=g.items.map(i=>i.prod).join(', ');
+    const pagado=Math.round((imput[g.ref]||0)*100)/100, resta=Math.round((g.total-pagado)*100)/100;
+    let badge='';
+    if(g.cancelada||resta<=0.01) badge='<span class="pill">✓ Pagada</span>';
+    else if(pagado>0.01) badge=`<span class="pill warn">resta ${fmtUSD(resta)}</span>`;
     return `<div class="mov">
-      <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')}</span><span class="mt v">${fmtUSD(g.total)}</span></div>
+      <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} ${badge}</span><span class="mt v">${fmtUSD(g.total)}</span></div>
       <div class="dt">${new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} · ${g.de} · ${g.coop}</div>
       <div class="dt" style="color:#999">${itx}</div></div>`;}).join('');
 }
@@ -680,10 +719,19 @@ async function guardarPago(){
   }
   const comprobante_url=comprobantes_urls[0]||null;
   const metodoLabel=METODO+breakdown;
+  const ventaRef=document.getElementById('p-venta').value||null;
   const {error}=await db.from('cc_movimientos').insert({fecha:document.getElementById('p-fecha').value||hoy(),
     tipo:'pago',comprobante:'Recibo',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
-    concepto,monto_usd,moneda,monto_orig,tc,metodo:metodoLabel,comprobante_url,comprobantes_urls:comprobantes_urls.length?comprobantes_urls:null,items,conciliado:true});
+    concepto,monto_usd,moneda,monto_orig,tc,metodo:metodoLabel,comprobante_url,comprobantes_urls:comprobantes_urls.length?comprobantes_urls:null,items,conciliado:true,venta_ref:ventaRef});
   if(error)return toast('Error: '+error.message);
+  if(ventaRef){
+    const {data:vs}=await db.from('cc_movimientos').select('monto_usd').eq('tipo','venta').eq('productor_id',pid).eq('creado_en',ventaRef);
+    const {data:ps}=await db.from('cc_movimientos').select('monto_usd').eq('tipo','pago').eq('productor_id',pid).eq('venta_ref',ventaRef);
+    const totalV=(vs||[]).reduce((a,r)=>a+Number(r.monto_usd),0);
+    const pagado=(ps||[]).reduce((a,r)=>a+Number(r.monto_usd),0);
+    if(pagado>=totalV-0.01){ await db.from('cc_movimientos').update({cancelada:true}).eq('tipo','venta').eq('productor_id',pid).eq('creado_en',ventaRef); toast('Venta cancelada por completo ✓'); }
+    else toast(`Pago a cuenta de la venta ✓ (resta ${fmtUSD(Math.round((totalV-pagado)*100)/100)})`);
+  }
   const prod=document.getElementById('p-prod').selectedOptions[0].text;
   const coop=COOPS.find(c=>c.id==cid);
   const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
@@ -691,6 +739,7 @@ async function guardarPago(){
     monto_usd,moneda,monto_orig,tc,concepto,metodo:metodoLabel,comprobantes:comprobantes_urls,
     deposito:DEPOSITO,total:DEPOSITO?total:null,gastos:DEPOSITO?gastosTot:null,neto:DEPOSITO?netoOrig:null,items,saldo:data?Number(data.saldo_usd):0});
   ['p-monto','p-ef','p-tr','p-concepto','p-nro'].forEach(i=>document.getElementById(i).value='');document.getElementById('p-equiv').innerHTML='';document.getElementById('p-archivo').value='';
+  document.getElementById('p-venta').value='';document.getElementById('p-venta-info').textContent='';
   document.getElementById('items-list').innerHTML='';if(DEPOSITO)addItem();
   saldoProdPago();
 }
