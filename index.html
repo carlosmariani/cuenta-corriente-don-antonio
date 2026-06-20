@@ -62,7 +62,7 @@
 </style>
 </head>
 <body>
-<header><h1>Cuenta Corriente</h1><div class="sub">Semillería Don Antonio · Agencias de Desarrollo</div></header>
+<header><h1>Cuenta Corriente</h1><div class="sub">Don Antonio S.R.L. · Suc. Jujuy · Agencia de Desarrollo</div></header>
 
 <div class="wrap">
   <!-- SALDOS -->
@@ -96,11 +96,21 @@
         <label>Nombre</label><input id="v-no" placeholder="Nombre">
         <label>DNI (opcional)</label><input id="v-dni" inputmode="numeric">
       </div>
+      <label>📷 Foto del DNI del socio (opcional)</label>
+      <input id="v-dnifoto" type="file" accept="image/*" capture="environment" style="padding:9px">
+      <div class="muted" id="v-dnifoto-info" style="margin-top:4px">Se guarda en la ficha del socio y se reusa en las próximas ventas.</div>
       <label>Productos / ítems que se lleva</label>
       <div id="v-items"></div>
       <button type="button" class="btn gray" style="margin-top:8px;padding:10px" onclick="addVItem()">+ Agregar ítem</button>
       <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:var(--verde-claro);border-radius:10px;font-size:15px"><span>Total venta</span><b id="v-total">U$S 0,00</b></div>
       <label>N° comprobante (opcional)</label><input id="v-nro">
+      <label style="display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:14px;color:#1a1a1a"><input type="checkbox" id="v-pagare" onchange="togglePagare()" style="width:auto;flex:none"> 📝 Generar pagaré (documento de deuda firmable)</label>
+      <div id="v-pagare-box" class="hidden">
+        <label>Vencimiento del pagaré</label><input id="v-venc" type="date"><div class="muted" style="margin-top:4px">Por defecto 100 días desde la venta. Editable.</div>
+        <label>Lugar de emisión</label>
+        <input id="v-lugar" list="lugares-list" value="Aguas Calientes - Jujuy" placeholder="Localidad">
+        <datalist id="lugares-list"><option value="Aguas Calientes - Jujuy"></option><option value="Santa Clara - Jujuy"></option></datalist>
+      </div>
       <button class="btn" onclick="guardarVenta()">Guardar venta</button>
     </div>
   </section>
@@ -161,9 +171,16 @@
     </div>
   </section>
 
-  <!-- RECIBOS -->
+  <!-- RECIBOS / VENTAS -->
   <section id="tab-recibos" class="hidden">
-    <div class="card"><h2 class="tt">Recibos emitidos</h2><div id="listaRecibos"><div class="spin">Cargando…</div></div></div>
+    <div class="card">
+      <div class="seg" style="margin-bottom:14px">
+        <button id="seg-rec" class="on" onclick="setReciboTab('recibos')">🧾 Recibos</button>
+        <button id="seg-ven" onclick="setReciboTab('ventas')">🛒 Ventas</button>
+      </div>
+      <div id="paneRecibos"><div id="listaRecibos"><div class="spin">Cargando…</div></div></div>
+      <div id="paneVentas" class="hidden"><div id="listaVentas"><div class="spin">Cargando…</div></div></div>
+    </div>
   </section>
 
   <!-- CONCILIAR -->
@@ -183,7 +200,7 @@
 <div id="reciboView">
   <div class="recibo">
     <div class="nro"><div class="emp">RECIBO N°</div><b id="r-nro"></b></div>
-    <h3 id="r-emp">Semillería Don Antonio S.R.L.</h3>
+    <h3 id="r-emp">Don Antonio S.R.L.</h3>
     <div class="emp" id="r-cliente"></div>
     <hr>
     <div class="ln"><span class="k">Fecha</span><span id="r-fecha"></span></div>
@@ -208,7 +225,7 @@
 <div id="ventaView">
   <div class="recibo">
     <div class="nro"><div class="emp">COMPROBANTE N°</div><b id="cv-nro"></b></div>
-    <h3>Semillería Don Antonio S.R.L.</h3>
+    <h3>Don Antonio S.R.L.</h3>
     <div class="emp">Comprobante de venta / entrega de mercadería</div>
     <hr>
     <div class="ln"><span class="k">Fecha</span><span id="cv-fecha"></span></div>
@@ -218,9 +235,10 @@
     <div style="font-size:12px;color:var(--gris);font-weight:600;margin-bottom:2px">Detalle</div>
     <div id="cv-items"></div>
     <div class="big" id="cv-total"></div>
-    <hr>
     <div class="ln"><span class="k">Saldo del socio</span><span id="cv-saldo"></span></div>
-    <div class="firma"><div class="lna"></div>Firma y aclaración (recibí conforme)</div>
+    <div id="cv-pagare"></div>
+    <div class="firma" style="margin-top:46px"><div class="lna"></div><span id="cv-firma-lbl">Firma y aclaración</span><div id="cv-firma-dni" style="margin-top:4px"></div></div>
+    <div id="cv-dni-img" style="text-align:center;margin-top:10px"></div>
     <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
       <button class="btn gray" style="margin:0" onclick="cerrarVenta()">Cerrar</button>
       <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
@@ -235,6 +253,16 @@ const SB_URL='https://sonrgnxebopeloamwntj.supabase.co';
 const SB_KEY='sb_publishable_jHAQp3l9fncT-MQaA4T_Vw_s9z76IcR';
 const db=supabase.createClient(SB_URL,SB_KEY);
 let COOPS=[],CFG={},TC=1000,MONEDA='ARS',METODO='Efectivo',DEPOSITO=false;
+const EMP_NOMBRE='Don Antonio S.R.L.', EMP_CUIT='30-71195185-3', PAGARE_LUGAR='';
+function togglePagare(){
+  const on=document.getElementById('v-pagare').checked;
+  document.getElementById('v-pagare-box').classList.toggle('hidden',!on);
+  if(on && !document.getElementById('v-venc').value){
+    const base=document.getElementById('v-fecha').value||hoy();
+    const d=new Date(base+'T00:00'); d.setDate(d.getDate()+100);
+    document.getElementById('v-venc').value=d.toISOString().slice(0,10);
+  }
+}
 const fmtUSD=n=>'U$S '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtARS=n=>'$ '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const hoy=()=>new Date().toISOString().slice(0,10);
@@ -486,35 +514,119 @@ async function guardarVenta(){
   if(!pid)return toast('Elegí o creá un socio');
   const items=vItems().filter(i=>i.prod&&i.total>0);
   if(!items.length)return toast('Cargá al menos un ítem (producto, cantidad y precio)');
+  let dniFotoUrl=null;
+  const dnifile=document.getElementById('v-dnifoto').files[0];
+  if(dnifile){
+    if(dnifile.size>10*1024*1024)return toast('La foto del DNI supera 10 MB');
+    toast('Subiendo foto del DNI…');
+    const ext=(dnifile.name.split('.').pop()||'jpg').toLowerCase();
+    const path=`dni/${pid}_${Date.now()}.${ext}`;
+    const up=await db.storage.from('comprobantes').upload(path,dnifile,{contentType:dnifile.type||undefined,upsert:true});
+    if(up.error)return toast('Error al subir DNI: '+up.error.message);
+    dniFotoUrl=db.storage.from('comprobantes').getPublicUrl(path).data.publicUrl;
+    await db.from('cc_productores').update({dni_foto_url:dniFotoUrl}).eq('id',pid);
+  }
   const nro=document.getElementById('v-nro').value||null, fch=document.getElementById('v-fecha').value||hoy();
+  const pagare=document.getElementById('v-pagare').checked;
+  const pagareVenc=pagare?(document.getElementById('v-venc').value||null):null;
+  const pagareLugar=pagare?(document.getElementById('v-lugar').value.trim()||null):null;
   const rows=items.map(i=>({fecha:fch,tipo:'venta',comprobante:'Venta',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
-    concepto:i.prod,monto_usd:i.total,moneda:'USD',monto_orig:i.total,obs:(i.cant?i.cant+' u × U$S '+i.prec:''),conciliado:true}));
+    concepto:i.prod,monto_usd:i.total,moneda:'USD',monto_orig:i.total,obs:(i.cant?i.cant+' u × U$S '+i.prec:''),conciliado:true,pagare,pagare_venc:pagareVenc,pagare_lugar:pagareLugar}));
   const {error}=await db.from('cc_movimientos').insert(rows);
   if(error)return toast('Error: '+error.message);
   toast(`Venta guardada ✓ (${rows.length} ítem${rows.length>1?'s':''})`);
   const coopName=(COOPS.find(c=>c.id==cid)||{}).nombre||'';
   const totalV=items.reduce((a,i)=>a+i.total,0);
   const {data:sd}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',pid).single();
-  mostrarComprobanteVenta({nro,fecha:fch,de:prodName,coop:coopName,items,total:totalV,saldo:sd?Number(sd.saldo_usd):0});
+  const {data:pd}=await db.from('cc_productores').select('dni,dni_foto_url').eq('id',pid).single();
+  mostrarComprobanteVenta({nro,fecha:fch,de:prodName,coop:coopName,items,total:totalV,saldo:sd?Number(sd.saldo_usd):0,dni:pd?pd.dni:null,dni_foto:dniFotoUrl||(pd?pd.dni_foto_url:null),pagare,pagare_venc:pagareVenc,pagare_lugar:pagareLugar});
   document.getElementById('v-items').innerHTML=''; addVItem(); vTotal();
-  ['v-nro','v-coopname','v-ap','v-no','v-dni'].forEach(i=>document.getElementById(i).value='');
+  ['v-nro','v-coopname','v-ap','v-no','v-dni','v-venc'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('v-dnifoto').value='';
+  document.getElementById('v-pagare').checked=false; document.getElementById('v-pagare-box').classList.add('hidden');
   document.getElementById('v-coop').value=cid; await cargarProdVenta();
 }
 
+function numeroALetras(num){
+  num=Math.floor(Math.abs(num)); if(num===0)return 'cero';
+  const UNI=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve'];
+  const DEC=['','diez','veinte','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const CEN=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const dec=n=>{ if(n<20)return UNI[n]; if(n<30)return n===20?'veinte':'veinti'+UNI[n-20]; const d=Math.floor(n/10),u=n%10; return DEC[d]+(u?' y '+UNI[u]:''); };
+  const cien=n=>{ if(n===0)return ''; if(n===100)return 'cien'; const c=Math.floor(n/100),r=n%100; return (CEN[c]+(r?' '+dec(r):'')).trim(); };
+  const miles=n=>{ const m=Math.floor(n/1000),r=n%1000; let s=''; if(m>0)s=(m===1?'mil':cien(m)+' mil'); if(r>0)s+=(s?' ':'')+cien(r); return s; };
+  const mill=Math.floor(num/1000000),resto=num%1000000; let s='';
+  if(mill>0)s=(mill===1?'un millón':miles(mill)+' millones'); if(resto>0)s+=(s?' ':'')+miles(resto);
+  return s.replace(/veintiuno mil/g,'veintiún mil').replace(/uno mil/g,'un mil');
+}
+function montoEnLetras(usd){ const ent=Math.floor(usd), cent=Math.round((usd-ent)*100); return 'dólares '+numeroALetras(ent)+' con '+String(cent).padStart(2,'0')+'/100'; }
+
 function mostrarComprobanteVenta(v){
   document.getElementById('cv-nro').textContent=v.nro||'—';
-  document.getElementById('cv-fecha').textContent=new Date(v.fecha+'T00:00').toLocaleDateString('es-AR');
+  const fechaTxt=new Date(v.fecha+'T00:00').toLocaleDateString('es-AR');
+  document.getElementById('cv-fecha').textContent=fechaTxt;
   document.getElementById('cv-de').textContent=v.de;
   document.getElementById('cv-coop').textContent=v.coop;
   document.getElementById('cv-items').innerHTML=v.items.map(i=>{
-    const det=i.cant?`${i.cant} u × ${fmtUSD(i.prec)}`:'';
+    const det=i.det||(i.cant?`${i.cant} u × ${fmtUSD(i.prec)}`:'');
     return `<div class="ln"><span class="k">${i.prod}${det?'<br><small style="color:#999">'+det+'</small>':''}</span><span>${fmtUSD(i.total)}</span></div>`;
   }).join('');
   document.getElementById('cv-total').textContent='Total venta: '+fmtUSD(v.total);
   document.getElementById('cv-saldo').textContent=fmtUSD(v.saldo);
+  const pg=document.getElementById('cv-pagare');
+  if(v.pagare){
+    const venc=v.pagare_venc?new Date(v.pagare_venc+'T00:00').toLocaleDateString('es-AR'):'a la vista';
+    const lugar=v.pagare_lugar||PAGARE_LUGAR;
+    const emis=lugar?`${lugar}, ${fechaTxt}`:fechaTxt;
+    pg.innerHTML=`<hr><div style="font-size:13px;font-weight:700;text-align:center;letter-spacing:1.5px">PAGARÉ</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gris);margin-top:6px"><span>Emisión: ${emis}</span><span>Vencimiento: <b style="color:var(--rojo)">${venc}</b></span></div>
+      <div style="font-size:12.5px;line-height:1.55;margin-top:8px;text-align:justify">Por igual valor recibido en mercadería detallada en el presente comprobante, <b>PAGARÉ</b> sin protesto (art. 50, Dec.-Ley 5965/63) a <b>${EMP_NOMBRE}</b>, CUIT ${EMP_CUIT}, o a su orden, la cantidad de <b>${fmtUSD(v.total)}</b> (${montoEnLetras(v.total)}). En caso de optar por el pago en pesos, el mismo se efectuará al tipo de cambio vigente a la fecha efectiva de pago. Firmante: <b>${v.de}</b>${v.dni?', DNI <b>'+v.dni+'</b>':''}.</div>`;
+    document.getElementById('cv-firma-lbl').textContent='Firma del deudor y aclaración';
+  }else{
+    pg.innerHTML='';
+    document.getElementById('cv-firma-lbl').textContent='Firma y aclaración (recibí conforme)';
+  }
+  document.getElementById('cv-firma-dni').textContent='DNI: '+(v.dni||'_______________');
+  const di=document.getElementById('cv-dni-img');
+  di.innerHTML=v.dni_foto?`<div style="font-size:11px;color:var(--gris);font-weight:600;margin-bottom:4px">Foto del DNI</div><img src="${v.dni_foto}" style="width:100%;max-height:300px;object-fit:contain;border:1px solid #e0e0e0;border-radius:8px">`:'';
   document.getElementById('ventaView').classList.add('show');
 }
 function cerrarVenta(){document.getElementById('ventaView').classList.remove('show');}
+
+function setReciboTab(which){
+  const isRec=which==='recibos';
+  document.getElementById('seg-rec').classList.toggle('on',isRec);
+  document.getElementById('seg-ven').classList.toggle('on',!isRec);
+  document.getElementById('paneRecibos').classList.toggle('hidden',!isRec);
+  document.getElementById('paneVentas').classList.toggle('hidden',isRec);
+  if(isRec)cargarRecibos(); else cargarVentas();
+}
+async function cargarVentas(){
+  const {data}=await db.from('cc_movimientos').select('*,cc_cooperativas(nombre),cc_productores(apellido,nombre,dni,dni_foto_url)').eq('tipo','venta').order('creado_en',{ascending:false}).order('id',{ascending:false});
+  const c=document.getElementById('listaVentas');
+  if(!data||!data.length){c.innerHTML='<p class="muted">Todavía no hay ventas.</p>';return;}
+  const groups=[],map={};
+  data.forEach(m=>{
+    const key=(m.creado_en||m.fecha)+'|'+m.productor_id;
+    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,
+      coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||'',
+      de:m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):'',
+      dni:m.cc_productores?m.cc_productores.dni:null,dni_foto:m.cc_productores?m.cc_productores.dni_foto_url:null,pagare:m.pagare,pagare_venc:m.pagare_venc,pagare_lugar:m.pagare_lugar,items:[],total:0}; groups.push(map[key]);}
+    map[key].items.push({prod:m.concepto,det:m.obs,total:Number(m.monto_usd)});
+    map[key].total=Math.round((map[key].total+Number(m.monto_usd))*100)/100;
+  });
+  c.innerHTML=groups.map(g=>{
+    const j=JSON.stringify(g).replace(/'/g,'&#39;');
+    const itx=g.items.map(i=>i.prod).join(', ');
+    return `<div class="mov">
+      <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')}</span><span class="mt v">${fmtUSD(g.total)}</span></div>
+      <div class="dt">${new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} · ${g.de} · ${g.coop}</div>
+      <div class="dt" style="color:#999">${itx}</div></div>`;}).join('');
+}
+async function reabrirVenta(g){
+  const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',g.pid).single();
+  mostrarComprobanteVenta({...g,saldo:data?Number(data.saldo_usd):0});
+}
 
 async function guardarPago(){
   const pid=document.getElementById('p-prod').value, cid=document.getElementById('p-coop').value;
