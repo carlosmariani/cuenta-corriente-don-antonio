@@ -404,6 +404,18 @@ async function cargarProdVenta(){
 }
 function toggleNewProd(){
   document.getElementById('v-newprod').classList.toggle('hidden',document.getElementById('v-prod').value!=='__new__');
+  checkDniFoto();
+}
+async function checkDniFoto(){
+  const info=document.getElementById('v-dnifoto-info'); if(!info)return;
+  const def='Se guarda en la ficha del socio y se reusa en las próximas ventas.';
+  const pid=document.getElementById('v-prod').value;
+  if(!pid||pid==='__new__'){ info.innerHTML=def; info.style.color=''; return; }
+  const {data}=await db.from('cc_productores').select('dni_foto_url').eq('id',pid).single();
+  if(data&&data.dni_foto_url){
+    info.innerHTML='✓ Este socio ya tiene foto de DNI cargada — no hace falta volver a subirla. <a href="'+data.dni_foto_url+'" target="_blank">Ver</a>. Subí una solo si querés reemplazarla.';
+    info.style.color='var(--verde2)';
+  }else{ info.innerHTML=def; info.style.color=''; }
 }
 function addVItem(){
   const row=document.createElement('div'); row.className='vitem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px';
