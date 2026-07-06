@@ -49,8 +49,8 @@
   .mov .cc{font-weight:600;font-size:14px}.mov .mt{font-weight:700;font-size:14px}
   .mov .mt.v{color:var(--rojo)}.mov .mt.p{color:var(--verde2)}
   .mov .dt{font-size:12px;color:var(--gris);margin-top:2px}
-  #reciboView,#ventaView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
-  #reciboView.show,#ventaView.show{display:flex}
+  #reciboView,#ventaView,#concretarView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
+  #reciboView.show,#ventaView.show,#concretarView.show{display:flex}
   .recibo{background:#fff;width:100%;max-width:520px;border-radius:12px;padding:26px;margin:auto;position:relative}
   .recibo h3{margin:0;font-size:19px;color:var(--verde)}.recibo .emp{font-size:12px;color:var(--gris)}
   .recibo .nro{position:absolute;top:22px;right:26px;text-align:right}.recibo .nro b{color:var(--rojo);font-size:17px}
@@ -186,6 +186,41 @@
     </div>
   </section>
 
+  <!-- PEDIDOS -->
+  <section id="tab-pedidos" class="hidden">
+    <div class="card">
+      <h2 class="tt">Cargar pedido</h2>
+      <label>Fecha</label><input id="pd-fecha" type="date">
+      <label>Cliente</label><input id="pd-cliente" placeholder="Nombre del cliente">
+      <label>Teléfono / contacto (opcional)</label><input id="pd-tel" placeholder="WhatsApp / teléfono">
+      <label>Moneda del precio</label>
+      <div class="seg"><button id="pd-ars" class="on" onclick="setPedMoneda('ARS')">Pesos $</button><button id="pd-usd" onclick="setPedMoneda('USD')">Dólares U$S</button></div>
+      <label>Qué pide</label>
+      <div id="pd-items"></div>
+      <button type="button" class="btn gray" style="margin-top:8px;padding:10px" onclick="addPdItem()">+ Agregar ítem</button>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:var(--verde-claro);border-radius:10px;font-size:15px"><span>Total pedido</span><b id="pd-total">$ 0</b></div>
+      <label>Notas (opcional)</label><textarea id="pd-datos" rows="2" placeholder="Detalles, entrega, dirección…"></textarea>
+      <button class="btn" onclick="guardarPedido()">Guardar pedido</button>
+    </div>
+    <div class="card"><h2 class="tt">Pedidos pendientes</h2><div id="listaPedidos"><div class="spin">Cargando…</div></div></div>
+  </section>
+
+  <!-- STOCK -->
+  <section id="tab-stock" class="hidden">
+    <div class="card">
+      <h2 class="tt">Ingresar stock (compra a Orán)</h2>
+      <label>Producto</label><input id="st-prod" list="stprod-list" placeholder="Ej: Tomate Nativo">
+      <datalist id="stprod-list"></datalist>
+      <label>Presentación</label><input id="st-pres" list="stpres-list" placeholder="Ej: Sobre x 1000">
+      <datalist id="stpres-list"><option value="Sobre x 1000"></option><option value="Sobre x 5000"></option><option value="Plantines"></option><option value="Bolsa"></option></datalist>
+      <label>Unidad</label><input id="st-unidad" value="sobres">
+      <label>Cantidad que ingresa</label><input id="st-cant" type="text" inputmode="decimal" placeholder="0">
+      <button class="btn" onclick="guardarStock()">Ingresar al stock</button>
+      <div class="muted" style="margin-top:6px">Si ya existe (mismo producto y presentación) se suma al stock actual.</div>
+    </div>
+    <div class="card"><h2 class="tt">Stock actual</h2><div id="listaStock"><div class="spin">Cargando…</div></div></div>
+  </section>
+
   <!-- CONCILIAR -->
   <section id="tab-conciliar" class="hidden">
     <div class="card"><h2 class="tt">A conciliar</h2><div id="listaConciliar"><div class="spin">Cargando…</div></div></div>
@@ -194,8 +229,10 @@
 
 <nav>
   <button data-tab="saldos" class="on" onclick="go('saldos')"><span class="ic">💰</span>Saldos</button>
+  <button data-tab="pedidos" onclick="go('pedidos')"><span class="ic">📋</span>Pedidos</button>
   <button data-tab="venta" onclick="go('venta')"><span class="ic">🛒</span>Venta</button>
   <button data-tab="pago" onclick="go('pago')"><span class="ic">✓</span>Pago</button>
+  <button data-tab="stock" onclick="go('stock')"><span class="ic">📦</span>Stock</button>
   <button data-tab="recibos" onclick="go('recibos')"><span class="ic">🧾</span>Recibos</button>
   <button data-tab="conciliar" onclick="go('conciliar')"><span class="ic">⚠️</span>Conciliar</button>
 </nav>
@@ -248,6 +285,32 @@
     </div>
   </div>
 </div>
+<div id="concretarView">
+  <div class="recibo" style="max-width:470px">
+    <h3 style="margin:0;color:var(--verde)">Concretar pedido → venta</h3>
+    <div class="emp" id="co-cliente"></div>
+    <div id="co-resumen" style="font-size:13px;margin:10px 0;background:var(--verde-claro);border-radius:10px;padding:10px"></div>
+    <label>¿Cómo se cobra?</label>
+    <div class="seg" style="flex-wrap:wrap">
+      <button id="co-m-contado" class="on" onclick="setConcModo('contado')">💵 Contado</button>
+      <button id="co-m-cc" onclick="setConcModo('cc')">📒 Cuenta cte.</button>
+      <button id="co-m-parcial" onclick="setConcModo('parcial')">➗ Parcial</button>
+    </div>
+    <div id="co-ccbox" class="hidden">
+      <label>Cuenta corriente</label>
+      <select id="co-coop" onchange="concCoopChange()"></select>
+      <select id="co-prod"></select>
+      <div id="co-tcbox"><label>Tipo de cambio (la deuda pasa a U$S)</label><input id="co-tc" type="text" inputmode="decimal" oninput="concCalc()"></div>
+      <div id="co-parcialbox" class="hidden"><label>Monto que paga ahora <span id="co-parcur"></span></label><input id="co-pagado" type="text" inputmode="decimal" oninput="concCalc()"></div>
+      <div class="muted" id="co-deuda" style="margin-top:6px"></div>
+    </div>
+    <label>Fecha de la venta</label><input id="co-fecha" type="date">
+    <div class="noprint" style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn gray" style="margin:0" onclick="cerrarConcretar()">Cancelar</button>
+      <button class="btn" style="margin:0" onclick="confirmarConcretar()">Confirmar venta</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -283,13 +346,15 @@ const cls=v=>Math.abs(v)<0.01?'zero':(v>0?'pos':'');
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
 function go(tab){
-  ['saldos','venta','pago','recibos','conciliar'].forEach(t=>{
+  ['saldos','pedidos','venta','pago','stock','recibos','conciliar'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
     document.querySelector(`nav button[data-tab="${t}"]`).classList.toggle('on',t===tab);
   });
   if(tab==='saldos')verCoops();
+  if(tab==='pedidos')cargarPedidos();
   if(tab==='pago')cargarProdPago();
   if(tab==='venta')cargarProdVenta();
+  if(tab==='stock')cargarStock();
   if(tab==='recibos')cargarRecibos();
   if(tab==='conciliar')cargarConciliar();
   window.scrollTo(0,0);
@@ -310,8 +375,10 @@ async function init(){
   document.getElementById('p-prod').addEventListener('change',saldoProdPago);
   setMoneda('ARS');setMetodo('Efectivo');
   addVItem(); vTotal(); cargarProdVenta();
+  document.getElementById('pd-fecha').value=hoy(); addPdItem(); pdTotal();
   verCoops();
 }
+let PEDMON='ARS', STOCK=[];
 document.getElementById('tc').addEventListener('input',e=>{TC=parseMonto(e.target.value)||0;verCoops();db.from('cc_config').update({valor:String(TC)}).eq('clave','tipo_cambio');});
 
 // ---------- SALDOS drill ----------
@@ -655,9 +722,9 @@ async function cargarVentas(){
   const groups=[],map={};
   data.forEach(m=>{
     const key=(m.creado_en||m.fecha)+'|'+m.productor_id;
-    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,ref:m.creado_en,cancelada:m.cancelada,
-      coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||'',
-      de:m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):'',
+    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,ref:m.creado_en,cancelada:m.cancelada,contado:m.contado,
+      coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||(m.contado?'Venta directa':''),
+      de:m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):(m.cliente||'—'),
       dni:m.cc_productores?m.cc_productores.dni:null,dni_foto:m.cc_productores?m.cc_productores.dni_foto_url:null,pagare:m.pagare,pagare_venc:m.pagare_venc,pagare_lugar:m.pagare_lugar,items:[],total:0}; groups.push(map[key]);}
     map[key].items.push({prod:m.concepto,det:m.obs,total:Number(m.monto_usd)});
     map[key].total=Math.round((map[key].total+Number(m.monto_usd))*100)/100;
@@ -667,7 +734,8 @@ async function cargarVentas(){
     const itx=g.items.map(i=>i.prod).join(', ');
     const pagado=Math.round((imput[g.ref]||0)*100)/100, resta=Math.round((g.total-pagado)*100)/100;
     let badge='';
-    if(g.cancelada||resta<=0.01) badge='<span class="pill">✓ Pagada</span>';
+    if(g.contado) badge='<span class="pill">💵 Contado</span>';
+    else if(g.cancelada||resta<=0.01) badge='<span class="pill">✓ Pagada</span>';
     else if(pagado>0.01) badge=`<span class="pill warn">resta ${fmtUSD(resta)}</span>`;
     return `<div class="mov">
       <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} ${badge}</span><span class="mt v">${fmtUSD(g.total)}</span></div>
@@ -808,6 +876,204 @@ async function cargarConciliar(){
   if(!data||!data.length){c.innerHTML='<p class="muted">✓ No hay items pendientes.</p>';return;}
   c.innerHTML=data.map(m=>`<div class="mov"><div class="top"><span class="cc">${m.comprobante||m.tipo} ${m.nro_comprobante||''}</span><span class="pill warn">conciliar</span></div>
     <div class="dt">${(m.cc_cooperativas&&m.cc_cooperativas.nombre)||''} · ${m.concepto||''}</div><div class="dt">${m.obs||''}</div></div>`).join('');
+}
+
+// ================= STOCK =================
+async function cargarStock(){
+  const {data}=await db.from('cc_stock').select('*').order('producto'); STOCK=data||[];
+  const names=[...new Set(STOCK.map(s=>s.producto))];
+  document.getElementById('stprod-list').innerHTML=names.map(n=>`<option value="${n}"></option>`).join('');
+  const c=document.getElementById('listaStock');
+  if(!STOCK.length){c.innerHTML='<p class="muted">Sin stock cargado todavía.</p>';return;}
+  c.innerHTML=STOCK.map(s=>{const low=Number(s.cantidad)<=0;
+    return `<div class="mov"><div class="top"><span class="cc">${s.producto}${s.presentacion?' · '+s.presentacion:''}</span>
+      <span class="mt ${low?'v':'p'}">${Number(s.cantidad).toLocaleString('es-AR')} ${s.unidad||''}</span></div>
+      <div style="display:flex;gap:6px;margin-top:5px">
+        <input type="text" inputmode="decimal" placeholder="+ ingresa / − ajusta" id="staj-${s.id}" style="flex:1;padding:8px">
+        <button class="btn gray" style="margin:0;padding:6px 12px;font-size:12px;width:auto;flex:none" onclick="ajustarStock(${s.id})">Aplicar</button>
+        <button class="btn gray" style="margin:0;padding:6px 10px;font-size:12px;width:auto;flex:none" onclick="borrarStock(${s.id},'${(s.producto||'').replace(/'/g,"\\'")}')">✕</button>
+      </div></div>`;}).join('');
+}
+async function cargarStockData(){ const {data}=await db.from('cc_stock').select('*').order('producto'); STOCK=data||[]; }
+async function guardarStock(){
+  const prod=document.getElementById('st-prod').value.trim();
+  const pres=document.getElementById('st-pres').value.trim()||null;
+  const uni=document.getElementById('st-unidad').value.trim()||'sobres';
+  const cant=parseMonto(document.getElementById('st-cant').value)||0;
+  if(!prod)return toast('Poné el producto');
+  if(!(cant>0))return toast('Poné la cantidad que ingresa');
+  const ex=STOCK.find(s=>s.producto.toLowerCase()===prod.toLowerCase() && (s.presentacion||'')===(pres||''));
+  if(ex){
+    await db.from('cc_stock').update({cantidad:Number(ex.cantidad)+cant}).eq('id',ex.id);
+    await db.from('cc_stock_mov').insert({stock_id:ex.id,tipo:'ingreso',cantidad:cant,motivo:'Compra a Orán'});
+  }else{
+    const {data,error}=await db.from('cc_stock').insert({producto:prod,presentacion:pres,unidad:uni,cantidad:cant}).select('id').single();
+    if(error)return toast('Error: '+error.message);
+    await db.from('cc_stock_mov').insert({stock_id:data.id,tipo:'ingreso',cantidad:cant,motivo:'Alta / compra a Orán'});
+  }
+  toast('Stock ingresado ✓');
+  ['st-prod','st-pres','st-cant'].forEach(i=>document.getElementById(i).value=''); document.getElementById('st-unidad').value='sobres';
+  cargarStock();
+}
+async function ajustarStock(id){
+  const v=parseMonto(document.getElementById('staj-'+id).value); if(isNaN(v)||v===0)return;
+  const s=STOCK.find(x=>x.id===id); if(!s)return;
+  await db.from('cc_stock').update({cantidad:Number(s.cantidad)+v}).eq('id',id);
+  await db.from('cc_stock_mov').insert({stock_id:id,tipo:(v>0?'ingreso':'ajuste'),cantidad:v,motivo:'Ajuste manual'});
+  toast('Stock ajustado'); cargarStock();
+}
+async function borrarStock(id,nom){ if(!confirm('¿Borrar "'+nom+'" del stock?'))return; await db.from('cc_stock').delete().eq('id',id); toast('Eliminado'); cargarStock(); }
+async function descontarStock(stockId,cant,motivo){
+  const {data}=await db.from('cc_stock').select('cantidad').eq('id',stockId).single();
+  if(data) await db.from('cc_stock').update({cantidad:Number(data.cantidad)-cant}).eq('id',stockId);
+  await db.from('cc_stock_mov').insert({stock_id:stockId,tipo:'egreso',cantidad:cant,motivo:motivo||'Venta'});
+}
+
+// ================= PEDIDOS =================
+function setPedMoneda(m){PEDMON=m;
+  document.getElementById('pd-ars').classList.toggle('on',m==='ARS');
+  document.getElementById('pd-usd').classList.toggle('on',m==='USD'); pdTotal();
+}
+const pedFmt=n=>(PEDMON==='ARS'?'$ ':'U$S ')+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:PEDMON==='ARS'?0:2,maximumFractionDigits:2});
+function addPdItem(){
+  const row=document.createElement('div'); row.className='pditem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
+  const opts=STOCK.map(s=>`<option value="${s.id}">${s.producto}${s.presentacion?' · '+s.presentacion:''}</option>`).join('');
+  row.innerHTML=`<select class="pi-stock" style="flex:2;min-width:120px"><option value="">— del stock… —</option>${opts}</select>
+    <input class="pi-desc" placeholder="Producto" style="flex:2;min-width:100px">
+    <input class="pi-cant" type="text" inputmode="decimal" placeholder="cant" style="flex:1;min-width:55px" oninput="pdTotal()">
+    <input class="pi-prec" type="text" inputmode="decimal" placeholder="precio" style="flex:1;min-width:65px" oninput="pdTotal()">
+    <button type="button" class="btn gray" style="margin:0;padding:0 12px;width:auto;flex:none" onclick="this.parentElement.remove();pdTotal()">✕</button>`;
+  document.getElementById('pd-items').appendChild(row);
+  row.querySelector('.pi-stock').addEventListener('change',function(){ if(this.value){row.querySelector('.pi-desc').value=this.selectedOptions[0].textContent;} });
+}
+function pdItems(){
+  const items=[];
+  document.querySelectorAll('#pd-items .pditem-row').forEach(r=>{
+    const sid=r.querySelector('.pi-stock').value||null;
+    const desc=r.querySelector('.pi-desc').value.trim();
+    const cant=parseMonto(r.querySelector('.pi-cant').value)||0, prec=parseMonto(r.querySelector('.pi-prec').value)||0;
+    if(desc||cant||prec) items.push({stock_id:sid?Number(sid):null,producto:desc,cant,precio:prec,total:Math.round(cant*prec*100)/100});
+  });
+  return items;
+}
+function pdTotal(){document.getElementById('pd-total').textContent=pedFmt(pdItems().reduce((a,i)=>a+i.total,0));}
+async function guardarPedido(){
+  const cliente=document.getElementById('pd-cliente').value.trim();
+  if(!cliente)return toast('Poné el nombre del cliente');
+  const items=pdItems().filter(i=>i.producto&&i.total>0);
+  if(!items.length)return toast('Cargá al menos un ítem con cantidad y precio');
+  const total=items.reduce((a,i)=>a+i.total,0);
+  const {error}=await db.from('cc_pedidos').insert({fecha:document.getElementById('pd-fecha').value||hoy(),
+    cliente,telefono:document.getElementById('pd-tel').value.trim()||null,datos:document.getElementById('pd-datos').value.trim()||null,
+    items,moneda:PEDMON,total,estado:'pendiente'});
+  if(error)return toast('Error: '+error.message);
+  toast('Pedido guardado ✓');
+  ['pd-cliente','pd-tel','pd-datos'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('pd-items').innerHTML=''; addPdItem(); pdTotal(); cargarPedidos();
+}
+async function cargarPedidos(){
+  await cargarStockData();
+  const rws=document.querySelectorAll('#pd-items .pditem-row');
+  const empty=[...rws].every(r=>!r.querySelector('.pi-desc').value && !r.querySelector('.pi-cant').value && !r.querySelector('.pi-prec').value);
+  if(empty){ document.getElementById('pd-items').innerHTML=''; addPdItem(); pdTotal(); }
+  const {data}=await db.from('cc_pedidos').select('*').eq('estado','pendiente').order('creado_en',{ascending:false});
+  const c=document.getElementById('listaPedidos');
+  if(!data||!data.length){c.innerHTML='<p class="muted">No hay pedidos pendientes.</p>';return;}
+  c.innerHTML=data.map(p=>{
+    const cur=p.moneda==='ARS'?'$ ':'U$S ';
+    const its=(p.items||[]).map(i=>`${i.cant||''} ${i.producto}${i.precio?' ('+cur+Number(i.precio).toLocaleString('es-AR')+')':''}`).join(' · ');
+    const j=JSON.stringify(p).replace(/'/g,"&#39;");
+    return `<div class="mov"><div class="top"><span class="cc">📋 ${p.cliente}</span><span class="mt v">${cur}${Number(p.total||0).toLocaleString('es-AR')}</span></div>
+      <div class="dt">${new Date(p.fecha+'T00:00').toLocaleDateString('es-AR')}${p.telefono?' · '+p.telefono:''}</div>
+      <div class="dt" style="color:#999">${its}</div>${p.datos?'<div class="dt">📝 '+p.datos+'</div>':''}
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn" style="margin:0;padding:7px 12px;font-size:13px;width:auto;flex:none" onclick='concretarPedido(${j})'>✓ Concretar</button>
+        <button class="btn gray" style="margin:0;padding:7px 12px;font-size:13px;width:auto;flex:none" onclick="anularPedido(${p.id})">Anular</button>
+      </div></div>`;}).join('');
+}
+async function anularPedido(id){ if(!confirm('¿Anular este pedido?'))return; await db.from('cc_pedidos').update({estado:'anulado'}).eq('id',id); toast('Pedido anulado'); cargarPedidos(); }
+
+// ============ CONCRETAR pedido -> venta ============
+let CONC=null;
+function concretarPedido(p){
+  CONC={...p,modo:'contado'};
+  document.getElementById('co-cliente').textContent='Cliente: '+p.cliente;
+  const cur=p.moneda==='ARS'?'$ ':'U$S ';
+  const its=(p.items||[]).map(i=>`${i.cant||''} × ${i.producto} — ${cur}${Number(i.total||0).toLocaleString('es-AR')}`).join('<br>');
+  document.getElementById('co-resumen').innerHTML=its+`<hr style="margin:6px 0;border:none;border-top:1px solid #cde"><b>Total: ${cur}${Number(p.total||0).toLocaleString('es-AR')}</b>`;
+  document.getElementById('co-fecha').value=hoy();
+  document.getElementById('co-tc').value=TC;
+  document.getElementById('co-pagado').value='';
+  document.getElementById('co-coop').innerHTML=COOPS.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')+`<option value="__new__">➕ Nueva cuenta (${p.cliente})</option>`;
+  concCoopChange(); setConcModo('contado');
+  document.getElementById('concretarView').classList.add('show');
+}
+function cerrarConcretar(){document.getElementById('concretarView').classList.remove('show'); CONC=null;}
+function setConcModo(m){ if(!CONC)return; CONC.modo=m;
+  ['contado','cc','parcial'].forEach(x=>document.getElementById('co-m-'+x).classList.toggle('on',x===m));
+  document.getElementById('co-ccbox').classList.toggle('hidden',m==='contado');
+  document.getElementById('co-parcialbox').classList.toggle('hidden',m!=='parcial');
+  document.getElementById('co-tcbox').classList.toggle('hidden',CONC.moneda!=='ARS');
+  document.getElementById('co-parcur').textContent=CONC.moneda==='ARS'?'($)':'(U$S)';
+  concCalc();
+}
+async function concCoopChange(){
+  const v=document.getElementById('co-coop').value;
+  if(v==='__new__'){ document.getElementById('co-prod').innerHTML='<option value="__new__">Nuevo socio ('+CONC.cliente+')</option>'; return; }
+  const {data}=await db.from('cc_productores').select('*').eq('cooperativa_id',v).order('apellido');
+  document.getElementById('co-prod').innerHTML=(data||[]).map(p=>`<option value="${p.id}">${p.apellido}, ${p.nombre||''}</option>`).join('')||'<option value="__new__">Nuevo socio ('+CONC.cliente+')</option>';
+}
+function concUsdTotal(){ const tc=parseMonto(document.getElementById('co-tc').value)||0; return CONC.moneda==='ARS'?(tc>0?Math.round(CONC.total/tc*100)/100:0):CONC.total; }
+function concCalc(){
+  if(!CONC||CONC.modo==='contado'){document.getElementById('co-deuda').innerHTML='';return;}
+  const usd=concUsdTotal(); let txt=`Deuda a cuenta corriente: <b>${fmtUSD(usd)}</b>`;
+  if(CONC.modo==='parcial'){
+    const tc=parseMonto(document.getElementById('co-tc').value)||0, pagado=parseMonto(document.getElementById('co-pagado').value)||0;
+    const pagUsd=CONC.moneda==='ARS'?(tc>0?pagado/tc:0):pagado;
+    txt+=`<br>Paga ahora: ${fmtUSD(pagUsd)} · Queda debiendo: <b>${fmtUSD(Math.round((usd-pagUsd)*100)/100)}</b>`;
+  }
+  document.getElementById('co-deuda').innerHTML=txt;
+}
+async function confirmarConcretar(){
+  const p=CONC; if(!p)return;
+  const fch=document.getElementById('co-fecha').value||hoy(); const cur=p.moneda; const contado=p.modo==='contado';
+  let tc=null,cid=null,pid=null;
+  if(!contado){
+    let coopv=document.getElementById('co-coop').value;
+    if(coopv==='__new__'){
+      const {data,error}=await db.from('cc_cooperativas').insert({nombre:p.cliente,tipo:'cliente'}).select('id').single();
+      if(error)return toast('Error cuenta: '+error.message);
+      cid=data.id; COOPS.push({id:cid,nombre:p.cliente,tipo:'cliente'}); COOPS.sort((a,b)=>a.nombre.localeCompare(b.nombre)); rebuildCoopSelects();
+    }else cid=Number(coopv);
+    let prodv=document.getElementById('co-prod').value;
+    if(prodv==='__new__'||!prodv){
+      const {data,error}=await db.from('cc_productores').insert({cooperativa_id:cid,apellido:p.cliente,nombre:''}).select('id').single();
+      if(error)return toast('Error socio: '+error.message); pid=data.id;
+    }else pid=Number(prodv);
+    if(cur==='ARS'){ tc=parseMonto(document.getElementById('co-tc').value); if(!(tc>0))return toast('Cargá el tipo de cambio'); }
+  }else{ tc=cur==='ARS'?TC:null; }
+  const rows=(p.items||[]).filter(i=>i.total>0).map(i=>{
+    const usd=cur==='ARS'?(tc>0?Math.round(i.total/tc*100)/100:0):i.total;
+    return {fecha:fch,tipo:'venta',comprobante:'Venta',cooperativa_id:cid,productor_id:pid,cliente:contado?p.cliente:null,
+      concepto:i.producto,monto_usd:usd,moneda:cur,monto_orig:i.total,tc,obs:(i.cant?i.cant+' × '+(cur==='ARS'?'$':'U$S')+' '+i.precio:''),conciliado:true,contado,pedido_id:p.id};
+  });
+  const {data:ins,error}=await db.from('cc_movimientos').insert(rows).select('creado_en');
+  if(error)return toast('Error: '+error.message);
+  const vcreado=ins&&ins[0]?ins[0].creado_en:null;
+  if(p.modo==='parcial'){
+    const pagado=parseMonto(document.getElementById('co-pagado').value)||0;
+    if(pagado>0){
+      const pagUsd=cur==='ARS'?Math.round(pagado/tc*100)/100:pagado;
+      const n=parseInt(CFG.prox_recibo_nro||'1',10); const nro='R-'+String(n).padStart(4,'0');
+      await db.from('cc_config').update({valor:String(n+1)}).eq('clave','prox_recibo_nro'); CFG.prox_recibo_nro=String(n+1);
+      await db.from('cc_movimientos').insert({fecha:fch,tipo:'pago',comprobante:'Recibo',nro_comprobante:nro,cooperativa_id:cid,productor_id:pid,
+        concepto:'Pago al concretar pedido',monto_usd:pagUsd,moneda:cur,monto_orig:pagado,tc,metodo:'Efectivo',conciliado:true,venta_ref:vcreado});
+    }
+  }
+  for(const i of (p.items||[])){ if(i.stock_id&&i.cant>0) await descontarStock(i.stock_id,i.cant,'Venta a '+p.cliente); }
+  await db.from('cc_pedidos').update({estado:'concretado',venta_creado_en:vcreado}).eq('id',p.id);
+  toast('Venta registrada ✓'+(contado?' (contado)':(p.modo==='parcial'?' (parcial)':' (cta cte)')));
+  cerrarConcretar(); cargarPedidos();
 }
 init();
 </script>
