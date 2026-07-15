@@ -802,6 +802,7 @@ async function cargarVentas(){
       dni:m.cc_productores?m.cc_productores.dni:null,dni_foto:m.cc_productores?m.cc_productores.dni_foto_url:null,pagare:m.pagare,pagare_venc:m.pagare_venc,pagare_lugar:m.pagare_lugar,items:[],total:0}; groups.push(map[key]);}
     map[key].items.push({prod:m.concepto,det:m.obs,total:Number(m.monto_usd),total_orig:Number(m.monto_orig||m.monto_usd)});
     map[key].total=Math.round((map[key].total+Number(m.monto_usd))*100)/100;
+    map[key].total_orig=Math.round(((map[key].total_orig||0)+Number(m.monto_orig||m.monto_usd))*100)/100;
   });
   c.innerHTML=groups.map(g=>{
     const j=JSON.stringify(g).replace(/'/g,'&#39;');
@@ -812,7 +813,7 @@ async function cargarVentas(){
     else if(g.cancelada||resta<=0.01) badge='<span class="pill">✓ Pagada</span>';
     else if(pagado>0.01) badge=`<span class="pill warn">resta ${fmtUSD(resta)}</span>`;
     return `<div class="mov">
-      <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} ${badge}</span><span class="mt v">${fmtUSD(g.total)}</span></div>
+      <div class="top" onclick='reabrirVenta(${j})' style="cursor:pointer"><span class="cc">🛒 ${g.nro||new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} ${badge}</span><span class="mt v">${g.moneda==='ARS'?'$ '+Number(g.total_orig||0).toLocaleString('es-AR'):fmtUSD(g.total)}</span></div>
       <div class="dt">${new Date(g.fecha+'T00:00').toLocaleDateString('es-AR')} · ${g.de} · ${g.coop}</div>
       <div class="dt" style="color:#999">${itx}</div></div>`;}).join('');
 }
