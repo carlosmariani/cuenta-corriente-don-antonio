@@ -49,8 +49,16 @@
   .mov .cc{font-weight:600;font-size:14px}.mov .mt{font-weight:700;font-size:14px}
   .mov .mt.v{color:var(--rojo)}.mov .mt.p{color:var(--verde2)}
   .mov .dt{font-size:12px;color:var(--gris);margin-top:2px}
-  #reciboView,#ventaView,#concretarView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
-  #reciboView.show,#ventaView.show,#concretarView.show{display:flex}
+  #reciboView,#ventaView,#concretarView,#resumenView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
+  #reciboView.show,#ventaView.show,#concretarView.show,#resumenView.show{display:flex}
+  .doc{background:#fff;width:100%;max-width:720px;border-radius:12px;padding:26px;margin:auto}
+  .doc h3{margin:0;font-size:19px;color:var(--verde)}.doc .emp{font-size:12px;color:var(--gris)}
+  .doc table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+  .doc th{background:var(--verde);color:#fff;padding:6px 8px;text-align:left}
+  .doc td{padding:5px 8px;border-bottom:1px solid var(--linea)}
+  .doc td.r,.doc th.r{text-align:right}
+  .doc tr.sub td{background:var(--verde-claro);font-weight:700}
+  .doc tr.tot td{background:var(--verde);color:#fff;font-weight:700}
   .recibo{background:#fff;width:100%;max-width:520px;border-radius:12px;padding:26px;margin:auto;position:relative}
   .recibo h3{margin:0;font-size:19px;color:var(--verde)}.recibo .emp{font-size:12px;color:var(--gris)}
   .recibo .nro{position:absolute;top:22px;right:26px;text-align:right}.recibo .nro b{color:var(--rojo);font-size:17px}
@@ -58,7 +66,7 @@
   .recibo .ln{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}.recibo .ln .k{color:var(--gris)}
   .recibo .big{font-size:22px;font-weight:700;text-align:center;background:var(--verde-claro);border-radius:10px;padding:14px;margin:12px 0}
   .recibo .firma{margin-top:32px;text-align:center;font-size:12px;color:var(--gris)}.recibo .firma .lna{border-top:1px solid #999;width:60%;margin:30px auto 4px}
-  @media print{body *{visibility:hidden}#reciboView.show,#reciboView.show *,#ventaView.show,#ventaView.show *{visibility:visible}#reciboView.show,#ventaView.show{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
+  @media print{body *{visibility:hidden}#reciboView.show,#reciboView.show *,#ventaView.show,#ventaView.show *,#resumenView.show,#resumenView.show *{visibility:visible}#reciboView.show,#ventaView.show,#resumenView.show{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo,.doc{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
 </style>
 </head>
 <body>
@@ -86,25 +94,37 @@
     <div class="card">
       <h2 class="tt">Cargar venta</h2>
       <label>Fecha</label><input id="v-fecha" type="date">
-      <label>Cooperativa / cuenta</label><select id="v-coop"></select>
-      <div id="v-newcoop" class="hidden">
-        <label>Nombre de la nueva cuenta / cliente</label><input id="v-coopname" placeholder="Ej: Coop. La Esperanza / Juan Pérez">
+      <label>Tipo de venta</label>
+      <div class="seg">
+        <button id="vv-cc" class="on" onclick="setVVModo('cc')">📒 Cuenta corriente (U$S)</button>
+        <button id="vv-contado" onclick="setVVModo('contado')">💵 Contado — pagada ($)</button>
       </div>
-      <label>Socio</label><select id="v-prod"></select>
-      <div id="v-newprod" class="hidden">
-        <label>Apellido</label><input id="v-ap" placeholder="Apellido">
-        <label>Nombre</label><input id="v-no" placeholder="Nombre">
-        <label>DNI (opcional)</label><input id="v-dni" inputmode="numeric">
+      <div id="v-ccfields">
+        <label>Cooperativa / cuenta</label><select id="v-coop"></select>
+        <div id="v-newcoop" class="hidden">
+          <label>Nombre de la nueva cuenta / cliente</label><input id="v-coopname" placeholder="Ej: Coop. La Esperanza / Juan Pérez">
+        </div>
+        <label>Socio</label><select id="v-prod"></select>
+        <div id="v-newprod" class="hidden">
+          <label>Apellido</label><input id="v-ap" placeholder="Apellido">
+          <label>Nombre</label><input id="v-no" placeholder="Nombre">
+          <label>DNI (opcional)</label><input id="v-dni" inputmode="numeric">
+        </div>
+        <label>📷 Foto del DNI del socio (opcional)</label>
+        <input id="v-dnifoto" type="file" accept="image/*" capture="environment" style="padding:9px">
+        <div class="muted" id="v-dnifoto-info" style="margin-top:4px">Se guarda en la ficha del socio y se reusa en las próximas ventas.</div>
       </div>
-      <label>📷 Foto del DNI del socio (opcional)</label>
-      <input id="v-dnifoto" type="file" accept="image/*" capture="environment" style="padding:9px">
-      <div class="muted" id="v-dnifoto-info" style="margin-top:4px">Se guarda en la ficha del socio y se reusa en las próximas ventas.</div>
-      <label>Productos / ítems que se lleva</label>
+      <div id="v-contadofields" class="hidden">
+        <label>Cliente</label><input id="v-cliente" placeholder="Nombre del cliente">
+        <label>Tipo de cambio del día (U$S 1 = $)</label><input id="v-tc" type="text" inputmode="decimal" oninput="vTotal()">
+        <div class="muted" style="margin-top:4px">Venta pagada en el acto. Queda en pesos, no afecta la cuenta corriente.</div>
+      </div>
+      <label>Productos / ítems que se lleva <span id="v-preclbl" class="muted"></span></label>
       <div id="v-items"></div>
       <button type="button" class="btn gray" style="margin-top:8px;padding:10px" onclick="addVItem()">+ Agregar ítem</button>
       <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:var(--verde-claro);border-radius:10px;font-size:15px"><span>Total venta</span><b id="v-total">U$S 0,00</b></div>
       <label>N° comprobante (opcional)</label><input id="v-nro">
-      <label style="display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:14px;color:#1a1a1a"><input type="checkbox" id="v-pagare" onchange="togglePagare()" style="width:auto;flex:none"> 📝 Generar pagaré (documento de deuda firmable)</label>
+      <label id="v-pagare-lbl" style="display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:14px;color:#1a1a1a"><input type="checkbox" id="v-pagare" onchange="togglePagare()" style="width:auto;flex:none"> 📝 Generar pagaré (documento de deuda firmable)</label>
       <div id="v-pagare-box" class="hidden">
         <label>Vencimiento del pagaré</label><input id="v-venc" type="date"><div class="muted" style="margin-top:4px">Por defecto 100 días desde la venta. Editable.</div>
         <label>Lugar de emisión</label>
@@ -311,8 +331,19 @@
     </div>
   </div>
 </div>
+<div id="resumenView">
+  <div class="doc">
+    <div id="resumen-content"></div>
+    <div class="noprint" style="display:flex;gap:10px;margin-top:22px">
+      <button class="btn gray" style="margin:0" onclick="cerrarResumen()">Cerrar</button>
+      <button class="btn gray" style="margin:0" onclick="descargarResumenExcel()">⬇ Excel</button>
+      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SB_URL='https://sonrgnxebopeloamwntj.supabase.co';
@@ -374,7 +405,7 @@ async function init(){
   document.getElementById('p-coop').addEventListener('change',cargarProdPago);
   document.getElementById('p-prod').addEventListener('change',saldoProdPago);
   setMoneda('ARS');setMetodo('Efectivo');
-  addVItem(); vTotal(); cargarProdVenta();
+  addVItem(); setVVModo('cc'); vTotal(); cargarProdVenta();
   document.getElementById('pd-fecha').value=hoy(); addPdItem(); pdTotal();
   verCoops();
 }
@@ -388,7 +419,7 @@ async function verCoops(){
   const tot=list.reduce((a,s)=>a+Number(s.saldo_usd),0);
   document.getElementById('totUsd').textContent=fmtUSD(tot);
   document.getElementById('totPesos').textContent='≈ '+fmtARS(tot*TC);
-  let h='<div class="muted" style="margin-bottom:8px">Tocá una cooperativa para ver sus socios</div>';
+  let h='<button class="btn gray" style="margin:0 0 10px" onclick="resumenTotal()">📄 Resumen general (PDF / Excel)</button><div class="muted" style="margin-bottom:8px">Tocá una cooperativa para ver sus socios</div>';
   h+=list.map(s=>`<div class="row" onclick="verSocios(${s.cooperativa_id},'${(s.nombre||'').replace(/'/g,"\\'")}')">
     <div><div class="nm">${s.nombre}</div><div class="ref">${s.referente?s.referente+' · ':''}${s.tipo}</div></div>
     <div style="display:flex;align-items:center"><div class="amt ${cls(s.saldo_usd)}">${fmtUSD(s.saldo_usd)}<small>${fmtARS(s.saldo_usd*TC)}</small></div><span class="chev">›</span></div></div>`).join('');
@@ -398,6 +429,7 @@ async function verSocios(coopId,nombre){
   const {data}=await db.from('cc_saldos_socio').select('*').eq('cooperativa_id',coopId);
   const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
   let h=`<div class="back" onclick="verCoops()">‹ Volver</div><h2 class="tt">${nombre}</h2>`;
+  h+=`<button class="btn gray" style="margin:0 0 10px" onclick="resumenCoop(${coopId},'${nombre.replace(/'/g,"\\'")}')">📄 Resumen de la cooperativa (PDF / Excel)</button>`;
   if(!list.length)h+='<div class="muted">Sin socios cargados.</div>';
   h+=list.map(s=>`<div class="row" onclick="verSocio(${s.productor_id},'${(s.apellido+', '+(s.nombre||'')).replace(/'/g,"\\'")}','${nombre.replace(/'/g,"\\'")}')">
     <div><div class="nm">${s.apellido}, ${s.nombre||''}</div><div class="ref">${s.dni?'DNI '+s.dni:''}</div></div>
@@ -413,6 +445,7 @@ async function verSocio(prodId,nombre,coop){
   h+=`<div class="totbox" style="margin-bottom:12px"><div class="lbl">Saldo del socio</div><div class="val" style="font-size:24px">${fmtUSD(saldo)}</div><div class="pesos">≈ ${fmtARS(saldo*TC)}</div></div>`;
   if(Math.abs(saldo)>=0.01 && Math.abs(saldo)<=50)
     h+=`<button class="btn gray" style="margin:0 0 12px" onclick="conciliarSocio(${prodId},'${coop.replace(/'/g,"\\'")}',${saldo})">⚖️ Dejar en cero (ajuste por redondeo)</button>`;
+  h+=`<button class="btn gray" style="margin:0 0 10px" onclick="resumenSocio(${prodId},'${nombre.replace(/'/g,"\\'")}','${coop.replace(/'/g,"\\'")}')">📄 Resumen del socio (PDF / Excel)</button>`;
   h+='<div class="muted" style="margin:6px 0">Detalle de lo que llevó y pagos</div>';
   h+=movs.map(m=>{
     const det=m.tipo==='venta'?(m.obs||''):((m.metodo||'Pago')+(m.moneda==='ARS'?' · $'+Number(m.monto_orig||0).toLocaleString('es-AR')+' @ TC '+m.tc:''));
@@ -504,7 +537,25 @@ function vItems(){
   });
   return items;
 }
-function vTotal(){ document.getElementById('v-total').textContent=fmtUSD(vItems().reduce((a,i)=>a+i.total,0)); }
+let VVMODO='cc';
+function setVVModo(m){VVMODO=m;
+  document.getElementById('vv-cc').classList.toggle('on',m==='cc');
+  document.getElementById('vv-contado').classList.toggle('on',m==='contado');
+  document.getElementById('v-ccfields').classList.toggle('hidden',m!=='cc');
+  document.getElementById('v-contadofields').classList.toggle('hidden',m!=='contado');
+  const pl=document.getElementById('v-pagare-lbl'); if(pl)pl.classList.toggle('hidden',m==='contado');
+  document.getElementById('v-preclbl').textContent=m==='contado'?'(precio en $)':'(precio en U$S)';
+  if(m==='contado'){document.getElementById('v-pagare').checked=false;document.getElementById('v-pagare-box').classList.add('hidden');
+    if(!document.getElementById('v-tc').value)document.getElementById('v-tc').value=TC;}
+  vTotal();
+}
+function vTotal(){
+  const t=vItems().reduce((a,i)=>a+i.total,0);
+  if(VVMODO==='contado'){
+    const tc=parseMonto(document.getElementById('v-tc').value)||0;
+    document.getElementById('v-total').textContent='$ '+t.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})+(tc>0?'  (≈ '+fmtUSD(t/tc)+')':'');
+  }else document.getElementById('v-total').textContent=fmtUSD(t);
+}
 async function cargarProdPago(){
   await llenarProd('p-coop','p-prod');
   const c=COOPS.find(x=>x.id==document.getElementById('p-coop').value);
@@ -603,7 +654,26 @@ function calcUsd(){
   document.getElementById('p-equiv').innerHTML=u>0?`Total imputado: <b>${fmtUSD(u)}</b>`:'';
 }
 
+async function guardarVentaContado(){
+  const cliente=document.getElementById('v-cliente').value.trim();
+  if(!cliente)return toast('Poné el nombre del cliente');
+  const tc=parseMonto(document.getElementById('v-tc').value);
+  if(!(tc>0))return toast('Cargá el tipo de cambio');
+  const items=vItems().filter(i=>i.prod&&i.total>0);
+  if(!items.length)return toast('Cargá al menos un ítem (producto, cantidad y precio)');
+  const nro=document.getElementById('v-nro').value||null, fch=document.getElementById('v-fecha').value||hoy();
+  const rows=items.map(i=>({fecha:fch,tipo:'venta',comprobante:'Venta',nro_comprobante:nro,cooperativa_id:null,productor_id:null,cliente,
+    concepto:i.prod,monto_usd:Math.round(i.total/tc*100)/100,moneda:'ARS',monto_orig:i.total,tc,obs:(i.cant?i.cant+' u × $ '+i.prec:''),conciliado:true,contado:true}));
+  const {error}=await db.from('cc_movimientos').insert(rows);
+  if(error)return toast('Error: '+error.message);
+  toast('Venta contado guardada ✓ (en pesos)');
+  const totalP=items.reduce((a,i)=>a+i.total,0);
+  mostrarComprobanteVenta({nro,fecha:fch,de:cliente,coop:'Venta directa · contado',items,total:totalP,saldo:0,moneda:'ARS',tc,contado:true});
+  document.getElementById('v-items').innerHTML=''; addVItem();
+  ['v-nro','v-cliente'].forEach(i=>document.getElementById(i).value=''); vTotal();
+}
 async function guardarVenta(){
+  if(VVMODO==='contado')return guardarVentaContado();
   let cid=document.getElementById('v-coop').value;
   if(cid==='__new__'){
     const nm=document.getElementById('v-coopname').value.trim();
@@ -679,12 +749,16 @@ function mostrarComprobanteVenta(v){
   document.getElementById('cv-fecha').textContent=fechaTxt;
   document.getElementById('cv-de').textContent=v.de;
   document.getElementById('cv-coop').textContent=v.coop;
+  const ars=v.moneda==='ARS';
+  const M=ars?(n=>'$ '+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})):fmtUSD;
   document.getElementById('cv-items').innerHTML=v.items.map(i=>{
-    const det=i.det||(i.cant?`${i.cant} u × ${fmtUSD(i.prec)}`:'');
-    return `<div class="ln"><span class="k">${i.prod}${det?'<br><small style="color:#999">'+det+'</small>':''}</span><span>${fmtUSD(i.total)}</span></div>`;
+    const det=i.det||(i.cant?`${i.cant} u × ${M(i.prec)}`:'');
+    return `<div class="ln"><span class="k">${i.prod}${det?'<br><small style="color:#999">'+det+'</small>':''}</span><span>${M(i.total)}</span></div>`;
   }).join('');
-  document.getElementById('cv-total').textContent='Total venta: '+fmtUSD(v.total);
-  document.getElementById('cv-saldo').textContent=fmtUSD(v.saldo);
+  document.getElementById('cv-total').textContent='Total venta: '+M(v.total)+(ars&&v.tc?'  (≈ '+fmtUSD(v.total/v.tc)+')':'');
+  const saldoLn=document.getElementById('cv-saldo');
+  if(v.contado){ saldoLn.textContent='PAGADO ✓ (contado, en pesos)'; saldoLn.style.color='var(--verde2)'; saldoLn.style.fontWeight='700'; }
+  else { saldoLn.textContent=fmtUSD(v.saldo); saldoLn.style.color=''; saldoLn.style.fontWeight=''; }
   const pg=document.getElementById('cv-pagare');
   if(v.pagare){
     const venc=v.pagare_venc?new Date(v.pagare_venc+'T00:00').toLocaleDateString('es-AR'):'a la vista';
@@ -722,11 +796,11 @@ async function cargarVentas(){
   const groups=[],map={};
   data.forEach(m=>{
     const key=(m.creado_en||m.fecha)+'|'+m.productor_id;
-    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,ref:m.creado_en,cancelada:m.cancelada,contado:m.contado,
-      coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||(m.contado?'Venta directa':''),
+    if(!map[key]){map[key]={fecha:m.fecha,nro:m.nro_comprobante,pid:m.productor_id,ref:m.creado_en,cancelada:m.cancelada,contado:m.contado,moneda:m.moneda,tc:m.tc,
+      coop:(m.cc_cooperativas&&m.cc_cooperativas.nombre)||(m.contado?'Venta directa · contado':''),
       de:m.cc_productores?m.cc_productores.apellido+', '+(m.cc_productores.nombre||''):(m.cliente||'—'),
       dni:m.cc_productores?m.cc_productores.dni:null,dni_foto:m.cc_productores?m.cc_productores.dni_foto_url:null,pagare:m.pagare,pagare_venc:m.pagare_venc,pagare_lugar:m.pagare_lugar,items:[],total:0}; groups.push(map[key]);}
-    map[key].items.push({prod:m.concepto,det:m.obs,total:Number(m.monto_usd)});
+    map[key].items.push({prod:m.concepto,det:m.obs,total:Number(m.monto_usd),total_orig:Number(m.monto_orig||m.monto_usd)});
     map[key].total=Math.round((map[key].total+Number(m.monto_usd))*100)/100;
   });
   c.innerHTML=groups.map(g=>{
@@ -743,8 +817,11 @@ async function cargarVentas(){
       <div class="dt" style="color:#999">${itx}</div></div>`;}).join('');
 }
 async function reabrirVenta(g){
-  const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',g.pid).single();
-  mostrarComprobanteVenta({...g,saldo:data?Number(data.saldo_usd):0});
+  let saldo=0;
+  if(g.pid){const {data}=await db.from('cc_saldos_socio').select('saldo_usd').eq('productor_id',g.pid).single();saldo=data?Number(data.saldo_usd):0;}
+  let v={...g,saldo};
+  if(g.moneda==='ARS'){ v.items=g.items.map(i=>({...i,total:i.total_orig})); v.total=Math.round(g.items.reduce((a,i)=>a+Number(i.total_orig||0),0)*100)/100; }
+  mostrarComprobanteVenta(v);
 }
 
 async function guardarPago(){
@@ -1074,6 +1151,75 @@ async function confirmarConcretar(){
   await db.from('cc_pedidos').update({estado:'concretado',venta_creado_en:vcreado}).eq('id',p.id);
   toast('Venta registrada ✓'+(contado?' (contado)':(p.modo==='parcial'?' (parcial)':' (cta cte)')));
   cerrarConcretar(); cargarPedidos();
+}
+// ================= RESUMEN DE CUENTA (PDF / Excel) =================
+let RESUMEN_XLS=null;
+function cerrarResumen(){document.getElementById('resumenView').classList.remove('show');}
+const fU=n=>(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function showResumen(html,filename,aoa){
+  document.getElementById('resumen-content').innerHTML=html;
+  RESUMEN_XLS={filename,aoa};
+  document.getElementById('resumenView').classList.add('show');
+}
+function docHead(titulo,sub){
+  const f=new Date().toLocaleDateString('es-AR');
+  return `<h3>${EMP_NOMBRE}</h3><div class="emp">${CFG.empresa_cliente?('Cliente: '+CFG.empresa_cliente):'Cuenta corriente'}</div>
+    <div style="font-size:16px;font-weight:700;margin-top:8px">${titulo}</div>
+    <div class="emp">${sub?sub+' · ':''}Emitido ${f} · TC ref. U$S 1 = $${TC}</div>`;
+}
+async function resumenSocio(prodId,nombre,coop){
+  const {data}=await db.from('cc_movimientos').select('*').eq('productor_id',prodId).order('fecha').order('id');
+  const movs=data||[]; let saldo=0, rows='', aoa=[[EMP_NOMBRE],['Resumen de cuenta',nombre],['Cooperativa',coop],[],['Fecha','Concepto','Detalle','Debe U$S','Haber U$S']];
+  movs.forEach(m=>{
+    const debe=m.tipo==='venta'?Number(m.monto_usd):0, haber=m.tipo!=='venta'?Number(m.monto_usd):0;
+    saldo+=debe-haber; const f=new Date(m.fecha+'T00:00').toLocaleDateString('es-AR');
+    rows+=`<tr><td>${f}</td><td>${m.concepto||m.tipo}</td><td>${m.obs||m.metodo||''}</td><td class="r">${debe?fU(debe):''}</td><td class="r">${haber?fU(haber):''}</td></tr>`;
+    aoa.push([f,m.concepto||m.tipo,m.obs||m.metodo||'',debe||'',haber||'']);
+  });
+  const html=docHead('Resumen de cuenta — '+nombre,coop)+
+    `<table><tr><th>Fecha</th><th>Concepto</th><th>Detalle</th><th class="r">Debe U$S</th><th class="r">Haber U$S</th></tr>${rows}
+     <tr class="tot"><td colspan="4">SALDO ACTUAL</td><td class="r">${fU(saldo)}</td></tr></table>
+     <div class="emp" style="margin-top:6px">≈ $ ${(saldo*TC).toLocaleString('es-AR',{maximumFractionDigits:0})} al TC de referencia</div>`;
+  aoa.push([]); aoa.push(['','','SALDO ACTUAL U$S','',Math.round(saldo*100)/100]);
+  showResumen(html,('Resumen '+nombre).replace(/[^\w -]/g,''),aoa);
+}
+async function resumenCoop(coopId,nombre){
+  const {data}=await db.from('cc_saldos_socio').select('*').eq('cooperativa_id',coopId);
+  const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
+  let rows='',tot=0,aoa=[[EMP_NOMBRE],['Resumen de cuenta',nombre],[],['Socio','DNI','Saldo U$S']];
+  list.forEach(s=>{ tot+=Number(s.saldo_usd);
+    rows+=`<tr><td>${s.apellido}, ${s.nombre||''}</td><td>${s.dni||''}</td><td class="r">${fU(s.saldo_usd)}</td></tr>`;
+    aoa.push([`${s.apellido}, ${s.nombre||''}`,s.dni||'',Math.round(Number(s.saldo_usd)*100)/100]);
+  });
+  const html=docHead('Resumen de cuenta — '+nombre,'Cooperativa / cuenta')+
+    `<table><tr><th>Socio</th><th>DNI</th><th class="r">Saldo U$S</th></tr>${rows}
+     <tr class="tot"><td colspan="2">TOTAL ${nombre}</td><td class="r">${fU(tot)}</td></tr></table>`;
+  aoa.push([]); aoa.push(['TOTAL '+nombre,'',Math.round(tot*100)/100]);
+  showResumen(html,('Resumen '+nombre).replace(/[^\w -]/g,''),aoa);
+}
+async function resumenTotal(){
+  const {data}=await db.from('cc_saldos').select('*');
+  const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
+  let rows='',deuda=0,dep=0,aoa=[[EMP_NOMBRE],['Resumen general — Cuenta Madre'],[],['Cooperativa / Cuenta','Referente','Tipo','Saldo U$S']];
+  list.forEach(s=>{ if(s.tipo==='deposito')dep+=Number(s.saldo_usd); else deuda+=Number(s.saldo_usd);
+    rows+=`<tr><td>${s.nombre}</td><td>${s.referente||''}</td><td>${s.tipo}</td><td class="r">${fU(s.saldo_usd)}</td></tr>`;
+    aoa.push([s.nombre,s.referente||'',s.tipo,Math.round(Number(s.saldo_usd)*100)/100]);
+  });
+  const neto=deuda+dep;
+  const html=docHead('Resumen general — Cuenta Madre','Todas las cuentas')+
+    `<table><tr><th>Cooperativa / Cuenta</th><th>Referente</th><th>Tipo</th><th class="r">Saldo U$S</th></tr>${rows}
+     <tr class="sub"><td colspan="3">Deuda total (sin depósitos)</td><td class="r">${fU(deuda)}</td></tr>
+     <tr class="sub"><td colspan="3">Depósitos en garantía (a devolver)</td><td class="r">${fU(-dep)}</td></tr>
+     <tr class="tot"><td colspan="3">NETO A COBRAR</td><td class="r">${fU(neto)}</td></tr></table>`;
+  aoa.push([],['Deuda total (sin depósitos)','','',Math.round(deuda*100)/100],
+    ['Depósitos a devolver','','',Math.round(-dep*100)/100],['NETO A COBRAR','','',Math.round(neto*100)/100]);
+  showResumen(html,'Resumen general Cuenta Madre',aoa);
+}
+function descargarResumenExcel(){
+  if(!RESUMEN_XLS||!window.XLSX)return toast('No se pudo generar el Excel');
+  const ws=XLSX.utils.aoa_to_sheet(RESUMEN_XLS.aoa);
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Resumen');
+  XLSX.writeFile(wb,(RESUMEN_XLS.filename||'Resumen')+'.xlsx');
 }
 init();
 </script>
