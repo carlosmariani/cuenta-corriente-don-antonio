@@ -416,10 +416,13 @@ document.getElementById('tc').addEventListener('input',e=>{TC=parseMonto(e.targe
 async function verCoops(){
   const {data}=await db.from('cc_saldos').select('*');
   const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
-  const tot=list.reduce((a,s)=>a+Number(s.saldo_usd),0);
+  const tot=list.filter(s=>s.tipo!=='aparte').reduce((a,s)=>a+Number(s.saldo_usd),0);
+  const aparte=list.filter(s=>s.tipo==='aparte').reduce((a,s)=>a+Number(s.saldo_usd),0);
   document.getElementById('totUsd').textContent=fmtUSD(tot);
   document.getElementById('totPesos').textContent='≈ '+fmtARS(tot*TC);
-  let h='<button class="btn gray" style="margin:0 0 10px" onclick="resumenTotal()">📄 Resumen general (PDF / Excel)</button><div class="muted" style="margin-bottom:8px">Tocá una cooperativa para ver sus socios</div>';
+  let h='<button class="btn gray" style="margin:0 0 10px" onclick="resumenTotal()">📄 Resumen general (PDF / Excel)</button>';
+  if(Math.abs(aparte)>=0.01) h+=`<div style="background:#eef3f7;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;display:flex;justify-content:space-between;align-items:center"><span class="muted">A cuenta / anticipos (aparte · no suma al total)</span><b style="white-space:nowrap">${fmtUSD(aparte)}</b></div>`;
+  h+='<div class="muted" style="margin-bottom:8px">Tocá una cooperativa para ver sus socios</div>';
   h+=list.map(s=>`<div class="row" onclick="verSocios(${s.cooperativa_id},'${(s.nombre||'').replace(/'/g,"\\'")}')">
     <div><div class="nm">${s.nombre}</div><div class="ref">${s.referente?s.referente+' · ':''}${s.tipo}</div></div>
     <div style="display:flex;align-items:center"><div class="amt ${cls(s.saldo_usd)}">${fmtUSD(s.saldo_usd)}<small>${fmtARS(s.saldo_usd*TC)}</small></div><span class="chev">›</span></div></div>`).join('');
@@ -1201,19 +1204,21 @@ async function resumenCoop(coopId,nombre){
 async function resumenTotal(){
   const {data}=await db.from('cc_saldos').select('*');
   const list=(data||[]).sort((a,b)=>b.saldo_usd-a.saldo_usd);
-  let rows='',deuda=0,dep=0,aoa=[[EMP_NOMBRE],['Resumen general — Cuenta Madre'],[],['Cooperativa / Cuenta','Referente','Tipo','Saldo U$S']];
-  list.forEach(s=>{ if(s.tipo==='deposito')dep+=Number(s.saldo_usd); else deuda+=Number(s.saldo_usd);
+  let rows='',deuda=0,dep=0,ap=0,aoa=[[EMP_NOMBRE],['Resumen general — Cuenta Madre'],[],['Cooperativa / Cuenta','Referente','Tipo','Saldo U$S']];
+  list.forEach(s=>{ if(s.tipo==='deposito')dep+=Number(s.saldo_usd); else if(s.tipo==='aparte')ap+=Number(s.saldo_usd); else deuda+=Number(s.saldo_usd);
     rows+=`<tr><td>${s.nombre}</td><td>${s.referente||''}</td><td>${s.tipo}</td><td class="r">${fU(s.saldo_usd)}</td></tr>`;
     aoa.push([s.nombre,s.referente||'',s.tipo,Math.round(Number(s.saldo_usd)*100)/100]);
   });
   const neto=deuda+dep;
+  const apRow=Math.abs(ap)>=0.01?`<tr class="sub"><td colspan="3">A cuenta / anticipos (aparte · no suma)</td><td class="r">${fU(ap)}</td></tr>`:'';
   const html=docHead('Resumen general — Cuenta Madre','Todas las cuentas')+
     `<table><tr><th>Cooperativa / Cuenta</th><th>Referente</th><th>Tipo</th><th class="r">Saldo U$S</th></tr>${rows}
      <tr class="sub"><td colspan="3">Deuda total (sin depósitos)</td><td class="r">${fU(deuda)}</td></tr>
      <tr class="sub"><td colspan="3">Depósitos en garantía (a devolver)</td><td class="r">${fU(-dep)}</td></tr>
-     <tr class="tot"><td colspan="3">NETO A COBRAR</td><td class="r">${fU(neto)}</td></tr></table>`;
+     <tr class="tot"><td colspan="3">NETO A COBRAR</td><td class="r">${fU(neto)}</td></tr>${apRow}</table>`;
   aoa.push([],['Deuda total (sin depósitos)','','',Math.round(deuda*100)/100],
     ['Depósitos a devolver','','',Math.round(-dep*100)/100],['NETO A COBRAR','','',Math.round(neto*100)/100]);
+  if(Math.abs(ap)>=0.01)aoa.push(['A cuenta / anticipos (aparte, no suma)','','',Math.round(ap*100)/100]);
   showResumen(html,'Resumen general Cuenta Madre',aoa);
 }
 function descargarResumenExcel(){
