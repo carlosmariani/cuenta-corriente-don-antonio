@@ -1177,8 +1177,18 @@ async function resumenSocio(prodId,nombre,coop){
   movs.forEach(m=>{
     const debe=m.tipo==='venta'?Number(m.monto_usd):0, haber=m.tipo!=='venta'?Number(m.monto_usd):0;
     saldo+=debe-haber; const f=new Date(m.fecha+'T00:00').toLocaleDateString('es-AR');
-    rows+=`<tr><td>${f}</td><td>${m.concepto||m.tipo}</td><td>${m.obs||m.metodo||''}</td><td class="r">${debe?fU(debe):''}</td><td class="r">${haber?fU(haber):''}</td></tr>`;
-    aoa.push([f,m.concepto||m.tipo,m.obs||m.metodo||'',debe||'',haber||'']);
+    let det;
+    if(m.tipo==='venta'){
+      det=m.obs||'';
+      if(m.moneda==='ARS'&&m.monto_orig)det+=(det?' · ':'')+'$'+Number(m.monto_orig).toLocaleString('es-AR')+' (TC '+m.tc+')';
+    }else{
+      const p=[]; if(m.metodo)p.push(m.metodo);
+      if(m.moneda==='ARS'&&m.monto_orig)p.push('Pago en pesos: $'+Number(m.monto_orig).toLocaleString('es-AR')+' (TC '+m.tc+')');
+      else if(m.moneda==='USD')p.push('Pago en U$S');
+      det=p.join(' · ')||m.obs||'';
+    }
+    rows+=`<tr><td>${f}</td><td>${m.concepto||m.tipo}</td><td>${det}</td><td class="r">${debe?fU(debe):''}</td><td class="r">${haber?fU(haber):''}</td></tr>`;
+    aoa.push([f,m.concepto||m.tipo,det,debe||'',haber||'']);
   });
   const html=docHead('Resumen de cuenta — '+nombre,coop)+
     `<table><tr><th>Fecha</th><th>Concepto</th><th>Detalle</th><th class="r">Debe U$S</th><th class="r">Haber U$S</th></tr>${rows}
