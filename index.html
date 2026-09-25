@@ -80,9 +80,12 @@
       <div class="val" id="totUsd">—</div>
       <div class="pesos" id="totPesos"></div>
     </div>
-    <div class="card" style="display:flex;align-items:center;gap:10px">
-      <label style="margin:0;flex:1">Tipo de cambio (U$S 1 = $)</label>
-      <input id="tc" type="text" inputmode="decimal" style="width:120px">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="margin:0;flex:1">Tipo de cambio (U$S 1 = $)</label>
+        <input id="tc" type="text" inputmode="decimal" style="width:120px">
+      </div>
+      <div class="muted" id="tc-info" style="margin-top:8px;font-size:12px">Dólar oficial (Banco Nación) — se actualiza solo al abrir. Podés editarlo a mano.</div>
     </div>
     <div class="card">
       <div id="drill"></div>
@@ -429,6 +432,24 @@ async function init(){
   addVItem(); setVVModo('cc'); vTotal(); cargarProdVenta();
   document.getElementById('pd-fecha').value=hoy(); addPdItem(); pdTotal();
   verCoops();
+  actualizarDolarOficial();
+}
+async function actualizarDolarOficial(){
+  try{
+    const r=await fetch('https://dolarapi.com/v1/dolares/oficial',{cache:'no-store'});
+    if(!r.ok)return;
+    const d=await r.json(); const v=Number(d.venta)||0;
+    if(v>0){
+      TC=v;
+      document.getElementById('tc').value=v;
+      const ptc=document.getElementById('p-tc'); if(ptc&&(!ptc.value||MONEDA==='ARS'))ptc.value=v;
+      const vtc=document.getElementById('v-tc'); if(vtc&&!vtc.value)vtc.value=v;
+      db.from('cc_config').update({valor:String(v)}).eq('clave','tipo_cambio');
+      const f=d.fechaActualizacion?new Date(d.fechaActualizacion).toLocaleDateString('es-AR'):hoy();
+      const info=document.getElementById('tc-info'); if(info)info.innerHTML='✓ Dólar oficial (Banco Nación) al '+f+': venta $'+v.toLocaleString('es-AR')+'. Se actualiza solo. Editá a mano si querés.';
+      if(document.getElementById('tab-saldos') && !document.getElementById('tab-saldos').classList.contains('hidden')) verCoops();
+    }
+  }catch(e){ const info=document.getElementById('tc-info'); if(info)info.textContent='No se pudo traer el dólar del día (sin conexión). Queda el último cargado. Editá a mano si querés.'; }
 }
 let PEDMON='ARS', STOCK=[];
 document.getElementById('tc').addEventListener('input',e=>{TC=parseMonto(e.target.value)||0;verCoops();db.from('cc_config').update({valor:String(TC)}).eq('clave','tipo_cambio');});
