@@ -278,7 +278,7 @@
     <div class="firma"><div class="lna"></div>Firma y aclaración</div>
     <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
       <button class="btn gray" style="margin:0" onclick="cerrarRecibo()">Cerrar</button>
-      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+      <button class="btn" style="margin:0" onclick="generarPDF(document.querySelector('#reciboView .recibo'),'Recibo '+document.getElementById('r-nro').textContent)">📄 Guardar PDF</button>
     </div>
   </div>
 </div>
@@ -301,7 +301,7 @@
     <div id="cv-dni-img" style="text-align:center;margin-top:10px"></div>
     <div class="noprint" style="display:flex;gap:10px;margin-top:24px">
       <button class="btn gray" style="margin:0" onclick="cerrarVenta()">Cerrar</button>
-      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+      <button class="btn" style="margin:0" onclick="generarPDF(document.querySelector('#ventaView .recibo'),'Comprobante '+document.getElementById('cv-nro').textContent)">📄 Guardar PDF</button>
     </div>
   </div>
 </div>
@@ -337,13 +337,15 @@
     <div class="noprint" style="display:flex;gap:10px;margin-top:22px">
       <button class="btn gray" style="margin:0" onclick="cerrarResumen()">Cerrar</button>
       <button class="btn gray" style="margin:0" onclick="descargarResumenExcel()">⬇ Excel</button>
-      <button class="btn" style="margin:0" onclick="window.print()">Imprimir / PDF</button>
+      <button class="btn" style="margin:0" onclick="generarPDF(document.querySelector('#resumenView .doc'), RESUMEN_XLS?RESUMEN_XLS.filename:'Resumen')">📄 Guardar PDF</button>
     </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SB_URL='https://sonrgnxebopeloamwntj.supabase.co';
@@ -375,6 +377,25 @@ function parseMonto(v){
 const elNum=id=>parseMonto(document.getElementById(id).value);
 const cls=v=>Math.abs(v)<0.01?'zero':(v>0?'pos':'');
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+async function generarPDF(node,filename){
+  if(!node){return;}
+  if(!window.jspdf||!window.html2canvas){ try{window.print();}catch(_){}; return; }
+  const btns=node.querySelectorAll('.noprint'); btns.forEach(b=>b.style.display='none');
+  toast('Generando PDF…');
+  try{
+    const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,allowTaint:false});
+    const img=canvas.toDataURL('image/jpeg',0.92);
+    const pdf=new window.jspdf.jsPDF('p','mm','a4');
+    const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+    const iw=pw, ih=canvas.height*pw/canvas.width;
+    let heightLeft=ih, position=0;
+    pdf.addImage(img,'JPEG',0,position,iw,ih); heightLeft-=ph;
+    while(heightLeft>0){ position-=ph; pdf.addPage(); pdf.addImage(img,'JPEG',0,position,iw,ih); heightLeft-=ph; }
+    pdf.save((filename||'documento').replace(/[^\w áéíóúñ.-]/gi,'').trim()+'.pdf');
+    toast('PDF generado ✓');
+  }catch(e){ toast('No se pudo generar el PDF: '+(e.message||e)); }
+  finally{ btns.forEach(b=>b.style.display=''); }
+}
 
 function go(tab){
   ['saldos','pedidos','venta','pago','stock','recibos','conciliar'].forEach(t=>{
