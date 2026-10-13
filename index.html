@@ -66,11 +66,27 @@
   .recibo .ln{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}.recibo .ln .k{color:var(--gris)}
   .recibo .big{font-size:22px;font-weight:700;text-align:center;background:var(--verde-claro);border-radius:10px;padding:14px;margin:12px 0}
   .recibo .firma{margin-top:32px;text-align:center;font-size:12px;color:var(--gris)}.recibo .firma .lna{border-top:1px solid #999;width:60%;margin:30px auto 4px}
+  #loginView{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+  #loginView .card{width:100%;max-width:380px}
+  #loginErr{color:var(--rojo);font-size:13px;margin-top:10px;min-height:16px}
+  header .salir{position:absolute;top:14px;right:16px;color:#fff;opacity:.85;font-size:13px;cursor:pointer;text-decoration:underline}
   @media print{body *{visibility:hidden}#reciboView.show,#reciboView.show *,#ventaView.show,#ventaView.show *,#resumenView.show,#resumenView.show *{visibility:visible}#reciboView.show,#ventaView.show,#resumenView.show{position:absolute;inset:0;background:#fff;padding:0;display:block}.recibo,.doc{box-shadow:none;max-width:100%;border-radius:0}.noprint{display:none!important}}
 </style>
 </head>
 <body>
-<header><h1>Cuenta Corriente</h1><div class="sub">Don Antonio S.R.L. · Suc. Jujuy · Agencia de Desarrollo</div></header>
+<div id="loginView">
+  <form class="card" onsubmit="event.preventDefault();entrar()">
+    <h2 class="tt">Cuenta Corriente</h2>
+    <div class="muted">Don Antonio S.R.L. — ingresá con tu usuario</div>
+    <label for="login-mail">Mail</label>
+    <input id="login-mail" type="email" autocomplete="username" required>
+    <label for="login-pass">Contraseña</label>
+    <input id="login-pass" type="password" autocomplete="current-password" required>
+    <button class="btn" id="login-btn" type="submit">Entrar</button>
+    <div id="loginErr"></div>
+  </form>
+</div>
+<header><h1>Cuenta Corriente</h1><div class="sub">Don Antonio S.R.L. · Suc. Jujuy · Agencia de Desarrollo</div><span class="salir" onclick="salir()">Salir</span></header>
 
 <div class="wrap">
   <!-- SALDOS -->
@@ -1279,7 +1295,40 @@ function descargarResumenExcel(){
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Resumen');
   XLSX.writeFile(wb,(RESUMEN_XLS.filename||'Resumen')+'.xlsx');
 }
-init();
+// Comprobantes y fotos de DNI: los links guardados son "públicos"; al mostrarlos se cambian por links firmados (vencen en 1 h)
+const PUB_COMPROB='/storage/v1/object/public/comprobantes/', FIRMAS={};
+function firmarUrl(u){
+  const path=decodeURIComponent(u.split(PUB_COMPROB)[1].split('?')[0]);
+  if(!FIRMAS[path])FIRMAS[path]=db.storage.from('comprobantes').createSignedUrl(path,3600).then(r=>r.data?r.data.signedUrl:null);
+  return FIRMAS[path];
+}
+function firmarEn(root){
+  if(!root.querySelectorAll)return;
+  const els=[...root.querySelectorAll(`a[href*="${PUB_COMPROB}"],img[src*="${PUB_COMPROB}"]`)];
+  if(root.matches&&root.matches(`a[href*="${PUB_COMPROB}"],img[src*="${PUB_COMPROB}"]`))els.push(root);
+  els.forEach(el=>{
+    const at=el.tagName==='IMG'?'src':'href', u=el.getAttribute(at);
+    firmarUrl(u).then(s=>{ if(s&&el.getAttribute(at)===u)el.setAttribute(at,s); });
+  });
+}
+new MutationObserver(ms=>ms.forEach(m=>{ if(m.type==='attributes')firmarEn(m.target); else m.addedNodes.forEach(firmarEn); }))
+  .observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['href','src']});
+let INICIADO=false;
+function arrancar(){ document.getElementById('loginView').classList.add('hidden'); if(!INICIADO){INICIADO=true;init();} }
+async function entrar(){
+  const btn=document.getElementById('login-btn'), err=document.getElementById('loginErr');
+  err.textContent=''; btn.disabled=true; btn.textContent='Entrando…';
+  const {error}=await db.auth.signInWithPassword({email:document.getElementById('login-mail').value.trim(),password:document.getElementById('login-pass').value});
+  btn.disabled=false; btn.textContent='Entrar';
+  if(error){ err.textContent='Mail o contraseña incorrectos.'; return; }
+  document.getElementById('login-pass').value='';
+  arrancar();
+}
+async function salir(){
+  if(!confirm('¿Cerrar sesión en este dispositivo?'))return;
+  await db.auth.signOut(); location.reload();
+}
+db.auth.getSession().then(({data})=>{ if(data&&data.session)arrancar(); });
 </script>
 </body>
 </html>
