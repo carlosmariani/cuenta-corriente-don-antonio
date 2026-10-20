@@ -252,10 +252,11 @@
       <datalist id="stprod-list"></datalist>
       <label>Presentación</label><input id="st-pres" list="stpres-list" placeholder="Ej: Sobre x 1000">
       <datalist id="stpres-list"><option value="Sobre x 1000"></option><option value="Sobre x 5000"></option><option value="Plantines"></option><option value="Bolsa"></option></datalist>
+      <label>Lote (opcional)</label><input id="st-lote" placeholder="Ej: K16757 · cosecha 2024">
       <label>Unidad</label><input id="st-unidad" value="sobres">
       <label>Cantidad que ingresa</label><input id="st-cant" type="text" inputmode="decimal" placeholder="0">
       <button class="btn" onclick="guardarStock()">Ingresar al stock</button>
-      <div class="muted" style="margin-top:6px">Si ya existe (mismo producto y presentación) se suma al stock actual.</div>
+      <div class="muted" style="margin-top:6px">Si ya existe (mismo producto, presentación y lote) se suma al stock actual.</div>
     </div>
     <div class="card"><h2 class="tt">Stock actual</h2><div id="listaStock"><div class="spin">Cargando…</div></div></div>
   </section>
@@ -581,20 +582,28 @@ async function checkDniFoto(){
     info.style.color='var(--verde2)';
   }else{ info.innerHTML=def; info.style.color=''; }
 }
+const stockLbl=s=>s.producto+(s.presentacion?' · '+s.presentacion:'')+(s.lote?' · Lote '+s.lote:'');
+async function llenarStockSel(sel){
+  if(sel.options.length>1)return;
+  if(!STOCK.length)await cargarStockData();
+  sel.insertAdjacentHTML('beforeend',STOCK.map(s=>`<option value="${s.id}">${stockLbl(s)} (quedan ${Number(s.cantidad).toLocaleString('es-AR')})</option>`).join(''));
+}
 function addVItem(){
-  const row=document.createElement('div'); row.className='vitem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px';
-  row.innerHTML=`<input class="vi-prod" placeholder="Producto / descripción" style="flex:2">
+  const row=document.createElement('div'); row.className='vitem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
+  row.innerHTML=`<select class="vi-stock" style="flex:1 1 100%" onfocus="llenarStockSel(this)" onmousedown="llenarStockSel(this)"><option value="">— del stock (descuenta) o escribí abajo —</option></select>
+    <input class="vi-prod" placeholder="Producto / descripción" style="flex:2">
     <input class="vi-cant" type="text" inputmode="decimal" placeholder="cant" style="flex:1" oninput="vTotal()">
     <input class="vi-prec" type="text" inputmode="decimal" placeholder="precio" style="flex:1" oninput="vTotal()">
     <button type="button" class="btn gray" style="margin:0;padding:0 12px;width:auto;flex:none" onclick="this.parentElement.remove();vTotal()">✕</button>`;
   document.getElementById('v-items').appendChild(row);
+  row.querySelector('.vi-stock').addEventListener('change',function(){ const st=STOCK.find(x=>x.id==this.value); if(st)row.querySelector('.vi-prod').value=stockLbl(st); });
 }
 function vItems(){
   const items=[];
   document.querySelectorAll('#v-items .vitem-row').forEach(r=>{
-    const prod=r.querySelector('.vi-prod').value.trim();
+    const prod=r.querySelector('.vi-prod').value.trim(), sid=r.querySelector('.vi-stock').value||null;
     const cant=parseMonto(r.querySelector('.vi-cant').value)||0, prec=parseMonto(r.querySelector('.vi-prec').value)||0;
-    if(prod||cant||prec) items.push({prod,cant,prec,total:Math.round(cant*prec*100)/100});
+    if(prod||cant||prec) items.push({prod,cant,prec,total:Math.round(cant*prec*100)/100,stock_id:sid?Number(sid):null});
   });
   return items;
 }
@@ -722,11 +731,14 @@ async function guardarVentaContado(){
   if(!(tc>0))return toast('Cargá el tipo de cambio');
   const items=vItems().filter(i=>i.prod&&i.total>0);
   if(!items.length)return toast('Cargá al menos un ítem (producto, cantidad y precio)');
+  if(items.some(i=>i.stock_id&&!(i.cant>0)))return toast('Poné la cantidad de lo que sale del stock');
   const nro=document.getElementById('v-nro').value||null, fch=document.getElementById('v-fecha').value||hoy();
   const rows=items.map(i=>({fecha:fch,tipo:'venta',comprobante:'Venta',nro_comprobante:nro,cooperativa_id:null,productor_id:null,cliente,
     concepto:i.prod,monto_usd:Math.round(i.total/tc*100)/100,moneda:'ARS',monto_orig:i.total,tc,obs:(i.cant?i.cant+' u × $ '+i.prec:''),conciliado:true,contado:true}));
   const {error}=await db.from('cc_movimientos').insert(rows);
   if(error)return toast('Error: '+error.message);
+  for(const i of items){ if(i.stock_id) await descontarStock(i.stock_id,i.cant,'Venta contado a '+cliente); }
+  if(items.some(i=>i.stock_id))cargarStockData();
   toast('Venta contado guardada ✓ (en pesos)');
   const totalP=items.reduce((a,i)=>a+i.total,0);
   mostrarComprobanteVenta({nro,fecha:fch,de:cliente,coop:'Venta directa · contado',items,total:totalP,saldo:0,moneda:'ARS',tc,contado:true});
@@ -757,6 +769,7 @@ async function guardarVenta(){
   if(!pid)return toast('Elegí o creá un socio');
   const items=vItems().filter(i=>i.prod&&i.total>0);
   if(!items.length)return toast('Cargá al menos un ítem (producto, cantidad y precio)');
+  if(items.some(i=>i.stock_id&&!(i.cant>0)))return toast('Poné la cantidad de lo que sale del stock');
   let dniFotoUrl=null;
   const dnifile=document.getElementById('v-dnifoto').files[0];
   if(dnifile){
@@ -777,6 +790,8 @@ async function guardarVenta(){
     concepto:i.prod,monto_usd:i.total,moneda:'USD',monto_orig:i.total,obs:(i.cant?i.cant+' u × U$S '+i.prec:''),conciliado:true,pagare,pagare_venc:pagareVenc,pagare_lugar:pagareLugar}));
   const {error}=await db.from('cc_movimientos').insert(rows);
   if(error)return toast('Error: '+error.message);
+  for(const i of items){ if(i.stock_id) await descontarStock(i.stock_id,i.cant,'Venta cta cte a '+prodName); }
+  if(items.some(i=>i.stock_id))cargarStockData();
   toast(`Venta guardada ✓ (${rows.length} ítem${rows.length>1?'s':''})`);
   const coopName=(COOPS.find(c=>c.id==cid)||{}).nombre||'';
   const totalV=items.reduce((a,i)=>a+i.total,0);
@@ -1019,7 +1034,7 @@ async function cargarConciliar(){
 
 // ================= STOCK =================
 async function cargarStock(){
-  const {data}=await db.from('cc_stock').select('*').order('producto'); STOCK=data||[];
+  const {data}=await db.from('cc_stock').select('*').order('producto').order('presentacion').order('lote'); STOCK=data||[];
   const names=[...new Set(STOCK.map(s=>s.producto))];
   document.getElementById('stprod-list').innerHTML=names.map(n=>`<option value="${n}"></option>`).join('');
   const c=document.getElementById('listaStock');
@@ -1027,31 +1042,33 @@ async function cargarStock(){
   c.innerHTML=STOCK.map(s=>{const low=Number(s.cantidad)<=0;
     return `<div class="mov"><div class="top"><span class="cc">${s.producto}${s.presentacion?' · '+s.presentacion:''}</span>
       <span class="mt ${low?'v':'p'}">${Number(s.cantidad).toLocaleString('es-AR')} ${s.unidad||''}</span></div>
+      <div class="dt">${s.lote?'Lote '+s.lote+' · ':''}${s.foto_url?`<a href="${s.foto_url}" target="_blank">📷 Ver foto</a> · `:''}<label style="display:inline;margin:0;font-size:12px;font-weight:600;color:var(--verde);cursor:pointer">${s.foto_url?'Cambiar foto':'📷 Agregar foto'}<input type="file" accept="image/*" class="hidden" onchange="fotoStock(${s.id},this)"></label></div>
       <div style="display:flex;gap:6px;margin-top:5px">
         <input type="text" inputmode="decimal" placeholder="+ ingresa / − ajusta" id="staj-${s.id}" style="flex:1;padding:8px">
         <button class="btn gray" style="margin:0;padding:6px 12px;font-size:12px;width:auto;flex:none" onclick="ajustarStock(${s.id})">Aplicar</button>
         <button class="btn gray" style="margin:0;padding:6px 10px;font-size:12px;width:auto;flex:none" onclick="borrarStock(${s.id},'${(s.producto||'').replace(/'/g,"\\'")}')">✕</button>
       </div></div>`;}).join('');
 }
-async function cargarStockData(){ const {data}=await db.from('cc_stock').select('*').order('producto'); STOCK=data||[]; }
+async function cargarStockData(){ const {data}=await db.from('cc_stock').select('*').order('producto').order('presentacion').order('lote'); STOCK=data||[]; }
 async function guardarStock(){
   const prod=document.getElementById('st-prod').value.trim();
   const pres=document.getElementById('st-pres').value.trim()||null;
+  const lote=document.getElementById('st-lote').value.trim()||null;
   const uni=document.getElementById('st-unidad').value.trim()||'sobres';
   const cant=parseMonto(document.getElementById('st-cant').value)||0;
   if(!prod)return toast('Poné el producto');
   if(!(cant>0))return toast('Poné la cantidad que ingresa');
-  const ex=STOCK.find(s=>s.producto.toLowerCase()===prod.toLowerCase() && (s.presentacion||'')===(pres||''));
+  const ex=STOCK.find(s=>s.producto.toLowerCase()===prod.toLowerCase() && (s.presentacion||'')===(pres||'') && (s.lote||'')===(lote||''));
   if(ex){
     await db.from('cc_stock').update({cantidad:Number(ex.cantidad)+cant}).eq('id',ex.id);
     await db.from('cc_stock_mov').insert({stock_id:ex.id,tipo:'ingreso',cantidad:cant,motivo:'Compra a Orán'});
   }else{
-    const {data,error}=await db.from('cc_stock').insert({producto:prod,presentacion:pres,unidad:uni,cantidad:cant}).select('id').single();
+    const {data,error}=await db.from('cc_stock').insert({producto:prod,presentacion:pres,lote,unidad:uni,cantidad:cant}).select('id').single();
     if(error)return toast('Error: '+error.message);
     await db.from('cc_stock_mov').insert({stock_id:data.id,tipo:'ingreso',cantidad:cant,motivo:'Alta / compra a Orán'});
   }
   toast('Stock ingresado ✓');
-  ['st-prod','st-pres','st-cant'].forEach(i=>document.getElementById(i).value=''); document.getElementById('st-unidad').value='sobres';
+  ['st-prod','st-pres','st-lote','st-cant'].forEach(i=>document.getElementById(i).value=''); document.getElementById('st-unidad').value='sobres';
   cargarStock();
 }
 async function ajustarStock(id){
@@ -1060,6 +1077,18 @@ async function ajustarStock(id){
   await db.from('cc_stock').update({cantidad:Number(s.cantidad)+v}).eq('id',id);
   await db.from('cc_stock_mov').insert({stock_id:id,tipo:(v>0?'ingreso':'ajuste'),cantidad:v,motivo:'Ajuste manual'});
   toast('Stock ajustado'); cargarStock();
+}
+async function fotoStock(id,inp){
+  const f=inp.files[0]; if(!f)return;
+  if(f.size>10*1024*1024)return toast('La foto supera 10 MB');
+  toast('Subiendo foto…');
+  const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`stock/${id}_${Date.now()}.${ext}`;
+  const up=await db.storage.from('comprobantes').upload(path,f,{contentType:f.type||undefined,upsert:false});
+  if(up.error)return toast('Error al subir: '+up.error.message);
+  const {error}=await db.from('cc_stock').update({foto_url:db.storage.from('comprobantes').getPublicUrl(path).data.publicUrl}).eq('id',id);
+  if(error)return toast('Error: '+error.message);
+  toast('Foto guardada ✓'); cargarStock();
 }
 async function borrarStock(id,nom){ if(!confirm('¿Borrar "'+nom+'" del stock?'))return; await db.from('cc_stock').delete().eq('id',id); toast('Eliminado'); cargarStock(); }
 async function descontarStock(stockId,cant,motivo){
@@ -1076,7 +1105,7 @@ function setPedMoneda(m){PEDMON=m;
 const pedFmt=n=>(PEDMON==='ARS'?'$ ':'U$S ')+(Number(n)||0).toLocaleString('es-AR',{minimumFractionDigits:PEDMON==='ARS'?0:2,maximumFractionDigits:2});
 function addPdItem(){
   const row=document.createElement('div'); row.className='pditem-row'; row.style.cssText='display:flex;gap:6px;margin-top:6px;flex-wrap:wrap';
-  const opts=STOCK.map(s=>`<option value="${s.id}">${s.producto}${s.presentacion?' · '+s.presentacion:''}</option>`).join('');
+  const opts=STOCK.map(s=>`<option value="${s.id}">${s.producto}${s.presentacion?' · '+s.presentacion:''}${s.lote?' · Lote '+s.lote:''}</option>`).join('');
   row.innerHTML=`<select class="pi-stock" style="flex:2;min-width:120px"><option value="">— del stock… —</option>${opts}</select>
     <input class="pi-desc" placeholder="Producto" style="flex:2;min-width:100px">
     <input class="pi-cant" type="text" inputmode="decimal" placeholder="cant" style="flex:1;min-width:55px" oninput="pdTotal()">
