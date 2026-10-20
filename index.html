@@ -49,8 +49,17 @@
   .mov .cc{font-weight:600;font-size:14px}.mov .mt{font-weight:700;font-size:14px}
   .mov .mt.v{color:var(--rojo)}.mov .mt.p{color:var(--verde2)}
   .mov .dt{font-size:12px;color:var(--gris);margin-top:2px}
-  #reciboView,#ventaView,#concretarView,#resumenView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
-  #reciboView.show,#ventaView.show,#concretarView.show,#resumenView.show{display:flex}
+  #reciboView,#ventaView,#concretarView,#resumenView,#docView{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:14px}
+  #reciboView.show,#ventaView.show,#concretarView.show,#resumenView.show,#docView.show{display:flex}
+  .subseg{display:flex;gap:6px;margin-bottom:12px}.subseg button{flex:1;padding:10px 4px;border:1.5px solid var(--linea);background:#fff;border-radius:10px;font-size:13px;font-weight:700;color:var(--gris);cursor:pointer}
+  .subseg button.on{border-color:var(--verde);background:var(--verde);color:#fff}
+  .badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:10px;background:#eceff1;color:#455a64;vertical-align:middle}
+  .badge.or{background:#fff3e0;color:#e65100}.badge.ms{background:var(--verde-claro);color:var(--verde)}
+  .lst-row{padding:10px 2px;border-bottom:1px solid var(--linea)}.lst-row .nm{font-size:14px;font-weight:600}
+  .lst-row .pr{font-size:14px;font-weight:700;color:var(--verde);white-space:nowrap}
+  .sug{border:1px solid var(--linea);border-radius:10px;margin-top:4px;max-height:280px;overflow:auto;background:#fff}
+  .sug div{padding:9px 10px;border-bottom:1px solid var(--linea);font-size:13px;cursor:pointer}.sug div:active{background:var(--verde-claro)}
+  .pritem{border:1px solid var(--linea);border-radius:10px;padding:8px;margin-top:8px}
   .doc{background:#fff;width:100%;max-width:720px;border-radius:12px;padding:26px;margin:auto}
   .doc h3{margin:0;font-size:19px;color:var(--verde)}.doc .emp{font-size:12px;color:var(--gris)}
   .doc table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
@@ -227,6 +236,28 @@
 
   <!-- PEDIDOS -->
   <section id="tab-pedidos" class="hidden">
+    <div class="subseg"><button id="pds-presu" class="on" onclick="pdSub('presu')">Presupuestos</button><button id="pds-cli" onclick="pdSub('cli')">Pedidos de clientes</button><button id="pds-oran" onclick="pdSub('oran')">Pedidos a Orán</button></div>
+    <div id="pdsub-presu">
+      <div class="card">
+        <h2 class="tt">Nuevo presupuesto</h2>
+        <label>Cliente</label><input id="pr-cliente" placeholder="Nombre del cliente">
+        <label>Teléfono / WhatsApp (opcional)</label><input id="pr-tel" placeholder="WhatsApp / teléfono">
+        <label>Tipo de cambio para el presupuesto (U$S 1 = $)</label><input id="pr-tc" type="text" inputmode="decimal" oninput="prRecalc()">
+        <div class="muted" style="font-size:12px;margin-top:4px">Los precios de la lista de Orán están en dólares; se pasan a pesos con este TC y con el IVA incluido. Si cambiás el TC se recalculan.</div>
+        <label>Agregar producto (lista de Orán o mi stock)</label>
+        <input id="pr-buscar" placeholder="Buscar: mataco, nativo, cinta…" oninput="prBuscar()" autocomplete="off">
+        <div id="pr-sug"></div>
+        <div id="pr-items"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:10px;padding:10px;background:var(--verde-claro);border-radius:10px;font-size:15px"><span>Total (IVA incluido)</span><b id="pr-total">$ 0</b></div>
+        <label>Notas (opcional)</label><textarea id="pr-notas" rows="2" placeholder="Forma de pago, entrega, validez…"></textarea>
+        <button class="btn" onclick="guardarPresupuesto()">Guardar y generar PDF</button>
+      </div>
+      <div class="card"><h2 class="tt">Presupuestos enviados</h2><div id="listaPresu"><div class="spin">Cargando…</div></div></div>
+    </div>
+    <div id="pdsub-oran" class="hidden">
+      <div class="card"><h2 class="tt">Pedidos a Orán</h2><div class="muted" style="margin-bottom:6px">Se generan al confirmar un presupuesto con productos que no tenés en tu stock.</div><div id="listaOran"><div class="spin">Cargando…</div></div></div>
+    </div>
+    <div id="pdsub-cli" class="hidden">
     <div class="card">
       <h2 class="tt">Cargar pedido</h2>
       <label>Fecha</label><input id="pd-fecha" type="date">
@@ -242,10 +273,26 @@
       <button class="btn" onclick="guardarPedido()">Guardar pedido</button>
     </div>
     <div class="card"><h2 class="tt">Pedidos pendientes</h2><div id="listaPedidos"><div class="spin">Cargando…</div></div></div>
+    </div>
   </section>
 
   <!-- STOCK -->
   <section id="tab-stock" class="hidden">
+    <div class="subseg"><button id="sts-mio" class="on" onclick="stSub('mio')">Mi stock</button><button id="sts-lista" onclick="stSub('lista')">Lista Orán</button></div>
+    <div id="stsub-lista" class="hidden">
+      <div class="card">
+        <h2 class="tt">Lista de precios · Orán</h2>
+        <div class="muted" id="lista-info" style="font-size:12px;margin-bottom:6px"></div>
+        <input id="ls-buscar" placeholder="Buscar producto o código…" oninput="verLista()" autocomplete="off">
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <select id="ls-rubro" onchange="verLista()" style="flex:1"><option value="">Todos los rubros</option></select>
+          <label style="margin:0;display:flex;align-items:center;gap:5px;font-weight:600;white-space:nowrap"><input type="checkbox" id="ls-constock" checked onchange="verLista()" style="width:auto">Con stock</label>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:6px">Precio con IVA incluido. ≈ $ al TC de la app.</div>
+        <div id="listaPrecios" style="margin-top:6px"><div class="spin">Cargando…</div></div>
+      </div>
+    </div>
+    <div id="stsub-mio">
     <div class="card">
       <h2 class="tt">Ingresar stock (compra a Orán)</h2>
       <label>Producto</label><input id="st-prod" list="stprod-list" placeholder="Ej: Tomate Nativo">
@@ -259,6 +306,7 @@
       <div class="muted" style="margin-top:6px">Si ya existe (mismo producto, presentación y lote) se suma al stock actual.</div>
     </div>
     <div class="card"><h2 class="tt">Stock actual</h2><div id="listaStock"><div class="spin">Cargando…</div></div></div>
+    </div>
   </section>
 
   <!-- CONCILIAR -->
@@ -361,6 +409,16 @@
     </div>
   </div>
 </div>
+<div id="docView">
+  <div class="doc">
+    <div id="doc-content"></div>
+    <div class="noprint" style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">
+      <button class="btn gray" style="margin:0;flex:1" onclick="document.getElementById('docView').classList.remove('show')">Cerrar</button>
+      <button class="btn gray" style="margin:0;flex:1" onclick="generarPDF(document.querySelector('#docView .doc'),DOCNAME)">📄 Guardar PDF</button>
+      <button class="btn" style="margin:0;flex:1 1 100%" onclick="compartirPDF(document.querySelector('#docView .doc'),DOCNAME)">📲 Enviar por WhatsApp</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -397,6 +455,29 @@ function parseMonto(v){
 const elNum=id=>parseMonto(document.getElementById(id).value);
 const cls=v=>Math.abs(v)<0.01?'zero':(v>0?'pos':'');
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+async function armarPDF(node){
+  const canvas=await html2canvas(node,{scale:2,backgroundColor:'#ffffff',useCORS:true,allowTaint:false});
+  const img=canvas.toDataURL('image/jpeg',0.92);
+  const pdf=new window.jspdf.jsPDF('p','mm','a4');
+  const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+  const ih=canvas.height*pw/canvas.width; let left=ih, pos=0;
+  pdf.addImage(img,'JPEG',0,pos,pw,ih); left-=ph;
+  while(left>0){ pos-=ph; pdf.addPage(); pdf.addImage(img,'JPEG',0,pos,pw,ih); left-=ph; }
+  return pdf;
+}
+const nombrePDF=f=>(f||'documento').replace(/[^\w áéíóúñ.-]/gi,'').trim()+'.pdf';
+async function compartirPDF(node,filename){
+  if(!node||!window.jspdf||!window.html2canvas)return;
+  const btns=node.querySelectorAll('.noprint'); btns.forEach(b=>b.style.display='none');
+  toast('Generando PDF…');
+  try{
+    const pdf=await armarPDF(node);
+    const file=new File([pdf.output('blob')],nombrePDF(filename),{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:filename}); }
+    else{ pdf.save(nombrePDF(filename)); toast('PDF descargado: adjuntalo en WhatsApp'); }
+  }catch(e){ if(e&&e.name!=='AbortError')toast('No se pudo compartir: '+(e.message||e)); }
+  finally{ btns.forEach(b=>b.style.display=''); }
+}
 async function generarPDF(node,filename){
   if(!node){return;}
   if(!window.jspdf||!window.html2canvas){ try{window.print();}catch(_){}; return; }
@@ -423,10 +504,10 @@ function go(tab){
     document.querySelector(`nav button[data-tab="${t}"]`).classList.toggle('on',t===tab);
   });
   if(tab==='saldos')verCoops();
-  if(tab==='pedidos')cargarPedidos();
+  if(tab==='pedidos')pdSub(PDSUB);
   if(tab==='pago')cargarProdPago();
   if(tab==='venta')cargarProdVenta();
-  if(tab==='stock')cargarStock();
+  if(tab==='stock')stSub(STSUB);
   if(tab==='recibos')cargarRecibos();
   if(tab==='conciliar')cargarConciliar();
   window.scrollTo(0,0);
@@ -1095,6 +1176,191 @@ async function descontarStock(stockId,cant,motivo){
   const {data}=await db.from('cc_stock').select('cantidad').eq('id',stockId).single();
   if(data) await db.from('cc_stock').update({cantidad:Number(data.cantidad)-cant}).eq('id',stockId);
   await db.from('cc_stock_mov').insert({stock_id:stockId,tipo:'egreso',cantidad:cant,motivo:motivo||'Venta'});
+}
+
+// ================= LISTA ORÁN / PRESUPUESTOS / PEDIDOS A ORÁN =================
+let LISTA=[], PDSUB='presu', STSUB='mio', PRITEMS=[], DOCNAME='documento';
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtP=n=>'$ '+Math.round(Number(n)||0).toLocaleString('es-AR');
+const fmtN=n=>(Number(n)||0).toLocaleString('es-AR');
+function pdSub(t){ PDSUB=t;
+  ['presu','cli','oran'].forEach(x=>{document.getElementById('pdsub-'+x).classList.toggle('hidden',x!==t);document.getElementById('pds-'+x).classList.toggle('on',x===t);});
+  if(t==='cli')cargarPedidos(); if(t==='presu')cargarPresupuestos(); if(t==='oran')cargarPedidosOran();
+}
+function stSub(t){ STSUB=t;
+  ['mio','lista'].forEach(x=>{document.getElementById('stsub-'+x).classList.toggle('hidden',x!==t);document.getElementById('sts-'+x).classList.toggle('on',x===t);});
+  if(t==='mio')cargarStock(); else cargarLista().then(verLista);
+}
+async function cargarLista(force){
+  if(LISTA.length&&!force)return;
+  let all=[];
+  for(let from=0;;from+=1000){
+    const {data,error}=await db.from('cc_lista').select('*').order('descripcion').range(from,from+999);
+    if(error){toast('Error lista: '+error.message);break;}
+    all=all.concat(data||[]); if(!data||data.length<1000)break;
+  }
+  LISTA=all;
+  const rub=[...new Set(LISTA.map(l=>l.rubro||'SIN RUBRO'))].sort();
+  const sel=document.getElementById('ls-rubro'), cur=sel.value;
+  sel.innerHTML='<option value="">Todos los rubros</option>'+rub.map(r=>`<option${r===cur?' selected':''}>${esc(r)}</option>`).join('');
+  const {data:cf}=await db.from('cc_config').select('valor').eq('clave','lista_actualizada').maybeSingle();
+  document.getElementById('lista-info').textContent=LISTA.length?`${LISTA.length} artículos · actualizada ${cf?cf.valor:'—'} (desde Icaro)`:'La lista todavía no se cargó desde Icaro.';
+}
+const precioConIva=l=>Math.round(Number(l.precio_usd||0)*(1+Number(l.iva||0)/100)*100)/100;
+function normal(t){return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+function verLista(){
+  const q=normal(document.getElementById('ls-buscar').value).split(/\s+/).filter(Boolean);
+  const rub=document.getElementById('ls-rubro').value, cs=document.getElementById('ls-constock').checked;
+  let r=LISTA.filter(l=>(!rub||(l.rubro||'SIN RUBRO')===rub)&&(!cs||Number(l.stock_oran)>0)&&q.every(w=>normal(l.descripcion+' '+l.codigo).includes(w)));
+  const tot=r.length; r=r.slice(0,80);
+  const c=document.getElementById('listaPrecios');
+  if(!tot){c.innerHTML='<p class="muted">Sin resultados.</p>';return;}
+  c.innerHTML=r.map(l=>{const u=precioConIva(l);
+    return `<div class="lst-row"><div class="top" style="display:flex;justify-content:space-between;gap:8px"><span class="nm">${esc(l.descripcion)}</span><span class="pr">U$S ${u.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+      <div class="dt" style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--gris);margin-top:2px"><span>Cód. ${esc(l.codigo)} · ${esc(l.rubro||'')} · IVA ${fmtN(l.iva)}%<br>Orán: <b>${fmtN(l.stock_oran)}</b> (Ind. ${fmtN(l.stock_industrial)} · Salón ${fmtN(l.stock_salon)})${l.fecha_precio?' · precio del '+new Date(l.fecha_precio+'T00:00').toLocaleDateString('es-AR'):''}</span><span style="white-space:nowrap">≈ ${fmtP(u*TC)}</span></div>
+      <button class="btn gray" style="margin:6px 0 0;padding:6px 10px;font-size:12px;width:auto" onclick="prAgregarLista('${esc(l.codigo)}');toast('Agregado al presupuesto')">+ Presupuesto</button></div>`;}).join('')
+    +(tot>80?`<p class="muted">Mostrando 80 de ${tot}. Afiná la búsqueda.</p>`:'');
+}
+// ---- armado del presupuesto ----
+function prTC(){ return parseMonto(document.getElementById('pr-tc').value)||TC; }
+function prBuscar(){
+  const q=normal(document.getElementById('pr-buscar').value).split(/\s+/).filter(Boolean), box=document.getElementById('pr-sug');
+  if(!q.length){box.innerHTML='';return;}
+  const ms=STOCK.filter(s=>q.every(w=>normal(stockLbl(s)).includes(w))).slice(0,6);
+  const ls=LISTA.filter(l=>q.every(w=>normal(l.descripcion+' '+l.codigo).includes(w))).sort((a,b)=>(b.stock_oran>0)-(a.stock_oran>0)).slice(0,12);
+  box.innerHTML=(ms.length||ls.length)?'<div class="sug">'+ms.map(s=>`<div onclick="prAgregarStock(${s.id})"><span class="badge ms">Mi stock</span> ${esc(stockLbl(s))} — quedan ${fmtN(s.cantidad)}</div>`).join('')
+    +ls.map(l=>`<div onclick="prAgregarLista('${esc(l.codigo)}')"><span class="badge or">Orán</span> ${esc(l.descripcion)} — U$S ${precioConIva(l).toFixed(2)} c/IVA · stock ${fmtN(l.stock_oran)}</div>`).join('')+'</div>':'<p class="muted">Sin resultados.</p>';
+}
+function prLimpiarBusq(){document.getElementById('pr-buscar').value='';document.getElementById('pr-sug').innerHTML='';}
+function prAgregarLista(cod){
+  const l=LISTA.find(x=>x.codigo===cod); if(!l)return;
+  if(!document.getElementById('pr-tc').value)document.getElementById('pr-tc').value=TC;
+  PRITEMS.push({origen:'oran',codigo:l.codigo,producto:l.descripcion,cant:1,iva:Number(l.iva||0),precio_usd:Math.round(precioConIva(l)*100)/100,manual:false,precio_ars:0});
+  prLimpiarBusq(); prRecalc();
+}
+function prAgregarStock(id){
+  const s=STOCK.find(x=>x.id===id); if(!s)return;
+  if(!document.getElementById('pr-tc').value)document.getElementById('pr-tc').value=TC;
+  PRITEMS.push({origen:'stock',stock_id:s.id,producto:s.producto+(s.presentacion?' · '+s.presentacion:''),cant:1,precio_usd:null,manual:true,precio_ars:0});
+  prLimpiarBusq(); prRecalc();
+}
+function prRecalc(){
+  const tc=prTC();
+  PRITEMS.forEach(i=>{ if(!i.manual&&i.precio_usd!=null)i.precio_ars=Math.round(i.precio_usd*tc); i.total_ars=Math.round((Number(i.cant)||0)*(Number(i.precio_ars)||0)); });
+  const opts=i=>`<option value="oran"${i.origen==='oran'?' selected':''}>Pedir a Orán</option>`+STOCK.map(s=>`<option value="${s.id}"${i.origen==='stock'&&i.stock_id===s.id?' selected':''}>Mi stock: ${esc(stockLbl(s))} (quedan ${fmtN(s.cantidad)})</option>`).join('');
+  document.getElementById('pr-items').innerHTML=PRITEMS.map((i,k)=>`<div class="pritem">
+    <div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:13px">${esc(i.producto)}</b><span style="cursor:pointer;color:var(--rojo);font-weight:700" onclick="PRITEMS.splice(${k},1);prRecalc()">✕</span></div>
+    <select style="margin-top:6px;padding:8px;font-size:13px" onchange="prOrigen(${k},this.value)">${opts(i)}</select>
+    <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+      <input type="text" inputmode="decimal" value="${i.cant}" style="flex:1;padding:8px" onchange="PRITEMS[${k}].cant=parseMonto(this.value)||0;prRecalc()" placeholder="cant">
+      <input type="text" inputmode="decimal" value="${i.precio_ars||''}" style="flex:2;padding:8px" onchange="PRITEMS[${k}].precio_ars=parseMonto(this.value)||0;PRITEMS[${k}].manual=true;prRecalc()" placeholder="precio $ c/IVA">
+      <b style="flex:2;text-align:right;font-size:13px">${fmtP(i.total_ars)}</b></div>
+    ${i.precio_usd!=null?`<div class="muted" style="font-size:11px;margin-top:3px">Lista: U$S ${i.precio_usd.toFixed(2)} c/IVA${i.manual?' · precio modificado a mano':''}</div>`:'<div class="muted" style="font-size:11px;margin-top:3px">Poné el precio en $ con IVA</div>'}
+  </div>`).join('');
+  document.getElementById('pr-total').textContent=fmtP(PRITEMS.reduce((a,i)=>a+(i.total_ars||0),0));
+}
+function prOrigen(k,v){ const i=PRITEMS[k]; if(v==='oran'){i.origen='oran';delete i.stock_id;} else {i.origen='stock';i.stock_id=Number(v);} prRecalc(); }
+async function proxNro(clave,pref){
+  const {data}=await db.from('cc_config').select('valor').eq('clave',clave).maybeSingle();
+  const n=parseInt((data&&data.valor)||'1',10);
+  await db.from('cc_config').upsert({clave,valor:String(n+1)});
+  return pref+String(n).padStart(4,'0');
+}
+async function guardarPresupuesto(){
+  const cliente=document.getElementById('pr-cliente').value.trim();
+  if(!cliente)return toast('Poné el nombre del cliente');
+  prRecalc();
+  const items=PRITEMS.filter(i=>i.cant>0&&i.precio_ars>0);
+  if(!items.length)return toast('Agregá al menos un producto con cantidad y precio');
+  if(items.length<PRITEMS.length&&!confirm('Hay ítems sin cantidad o sin precio: no se incluyen. ¿Seguir?'))return;
+  const tc=prTC(), total=items.reduce((a,i)=>a+i.total_ars,0);
+  const nro=await proxNro('prox_presupuesto_nro','P-');
+  const row={nro,fecha:hoy(),cliente,telefono:document.getElementById('pr-tel').value.trim()||null,tc,items,total_ars:total,total_usd:Math.round(total/tc*100)/100,notas:document.getElementById('pr-notas').value.trim()||null,estado:'enviado'};
+  const {data,error}=await db.from('cc_presupuestos').insert(row).select('*').single();
+  if(error)return toast('Error: '+error.message);
+  toast('Presupuesto '+nro+' guardado ✓');
+  PRITEMS=[]; ['pr-cliente','pr-tel','pr-notas'].forEach(i=>document.getElementById(i).value=''); prRecalc();
+  verPresupuesto(data); cargarPresupuestos();
+}
+function docHeader(titulo,nro,fecha){
+  return `<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h3>${EMP_NOMBRE}</h3><div class="emp">Suc. Jujuy · Agencia de Desarrollo · CUIT ${EMP_CUIT}</div></div>
+    <div style="text-align:right"><div class="emp">${titulo}</div><b style="color:var(--rojo);font-size:17px">${esc(nro||'')}</b><div class="emp">${new Date(fecha+'T00:00').toLocaleDateString('es-AR')}</div></div></div>`;
+}
+function verPresupuesto(p){
+  DOCNAME='Presupuesto '+(p.nro||'')+' - '+p.cliente;
+  document.getElementById('doc-content').innerHTML=docHeader('PRESUPUESTO',p.nro,p.fecha)+
+    `<div style="margin-top:14px;font-size:14px"><b>Cliente:</b> ${esc(p.cliente)}${p.telefono?' · '+esc(p.telefono):''}</div>
+    <table><tr><th class="r">Cant.</th><th>Producto</th><th class="r">Precio unit.</th><th class="r">Subtotal</th></tr>
+    ${(p.items||[]).map(i=>`<tr><td class="r">${fmtN(i.cant)}</td><td>${esc(i.producto)}</td><td class="r">${fmtP(i.precio_ars)}</td><td class="r">${fmtP(i.total_ars)}</td></tr>`).join('')}
+    <tr class="tot"><td></td><td>TOTAL</td><td></td><td class="r">${fmtP(p.total_ars)}</td></tr></table>
+    <div class="emp" style="margin-top:10px">Precios en pesos con IVA incluido. Sujeto a disponibilidad de stock.</div>
+    ${p.notas?`<div style="margin-top:8px;font-size:13px">📝 ${esc(p.notas)}</div>`:''}`;
+  document.getElementById('docView').classList.add('show');
+}
+async function cargarPresupuestos(){
+  await cargarStockData(); await cargarLista();
+  if(!document.getElementById('pr-tc').value)document.getElementById('pr-tc').value=TC;
+  const {data}=await db.from('cc_presupuestos').select('*').order('creado_en',{ascending:false}).limit(40);
+  const c=document.getElementById('listaPresu');
+  if(!data||!data.length){c.innerHTML='<p class="muted">Todavía no hay presupuestos.</p>';return;}
+  window._PRESU={}; data.forEach(p=>_PRESU[p.id]=p);
+  const est={enviado:'<span class="pill warn">Enviado</span>',confirmado:'<span class="pill">Confirmado</span>',rechazado:'<span class="pill" style="background:#eceff1;color:#777">Rechazado</span>'};
+  c.innerHTML=data.map(p=>`<div class="mov"><div class="top"><span class="cc">📝 ${esc(p.nro||'')} · ${esc(p.cliente)}</span><span class="mt">${fmtP(p.total_ars)}</span></div>
+    <div class="dt">${new Date(p.fecha+'T00:00').toLocaleDateString('es-AR')}${p.telefono?' · '+esc(p.telefono):''} · ${est[p.estado]||p.estado}</div>
+    <div class="dt" style="color:#999">${(p.items||[]).map(i=>`${fmtN(i.cant)} ${esc(i.producto)} <span class="badge ${i.origen==='oran'?'or':'ms'}">${i.origen==='oran'?'Orán':'Mi stock'}</span>`).join(' · ')}</div>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button class="btn gray" style="margin:0;padding:7px 10px;font-size:12px;width:auto" onclick="verPresupuesto(_PRESU[${p.id}])">📄 PDF</button>
+      ${p.estado==='enviado'?`<button class="btn" style="margin:0;padding:7px 10px;font-size:12px;width:auto" onclick="confirmarPresupuesto(${p.id})">✓ Confirmar</button>
+      <button class="btn gray" style="margin:0;padding:7px 10px;font-size:12px;width:auto" onclick="rechazarPresupuesto(${p.id})">Rechazar</button>`:''}
+    </div></div>`).join('');
+}
+async function rechazarPresupuesto(id){ if(!confirm('¿Marcar el presupuesto como rechazado?'))return; await db.from('cc_presupuestos').update({estado:'rechazado'}).eq('id',id); cargarPresupuestos(); }
+async function confirmarPresupuesto(id){
+  const p=_PRESU[id]; if(!p)return;
+  const deOran=(p.items||[]).filter(i=>i.origen==='oran');
+  if(!confirm(`Confirmar ${p.nro} de ${p.cliente}:\n• Se crea el pedido del cliente (para concretar la venta)`+(deOran.length?`\n• Se crea un pedido a Orán con ${deOran.length} producto(s)`:'')))return;
+  let po=null;
+  if(deOran.length){
+    const nroO=await proxNro('prox_pedido_oran_nro','PO-');
+    const {data,error}=await db.from('cc_pedidos_oran').insert({nro:nroO,fecha:hoy(),presupuesto_id:p.id,cliente:p.cliente,telefono:p.telefono,
+      items:deOran.map(i=>({codigo:i.codigo,producto:i.producto,cant:i.cant})),notas:p.notas,estado:'pedido'}).select('*').single();
+    if(error)return toast('Error pedido a Orán: '+error.message); po=data;
+  }
+  const items=(p.items||[]).map(i=>({stock_id:i.origen==='stock'?i.stock_id:null,producto:i.producto+(i.origen==='oran'?' (pedido a Orán '+(po?po.nro:'')+')':''),cant:i.cant,precio:i.precio_ars,total:i.total_ars}));
+  const {data:pc,error:e2}=await db.from('cc_pedidos').insert({fecha:hoy(),cliente:p.cliente,telefono:p.telefono,datos:'Desde presupuesto '+(p.nro||'')+(p.notas?' · '+p.notas:''),
+    items,moneda:'ARS',total:p.total_ars,estado:'pendiente',presupuesto_id:p.id}).select('id').single();
+  if(e2)return toast('Error pedido: '+e2.message);
+  await db.from('cc_presupuestos').update({estado:'confirmado',pedido_id:pc.id,pedido_oran_id:po?po.id:null}).eq('id',p.id);
+  toast('Presupuesto confirmado ✓'); cargarPresupuestos();
+  if(po)verPedidoOran(po);
+}
+// ---- pedidos a Orán ----
+function verPedidoOran(o){
+  DOCNAME='Pedido a Orán '+(o.nro||'')+' - '+(o.cliente||'');
+  document.getElementById('doc-content').innerHTML=docHeader('PEDIDO A ORÁN',o.nro,o.fecha)+
+    `<div style="margin-top:14px;font-size:14px"><b>Pide:</b> Sucursal Jujuy · Agencia de Desarrollo</div>
+    <div style="font-size:14px;margin-top:4px"><b>Para el cliente:</b> ${esc(o.cliente||'')}${o.telefono?' · '+esc(o.telefono):''}</div>
+    <table><tr><th>Código</th><th>Producto</th><th class="r">Cantidad</th></tr>
+    ${(o.items||[]).map(i=>`<tr><td>${esc(i.codigo||'')}</td><td>${esc(i.producto)}</td><td class="r">${fmtN(i.cant)}</td></tr>`).join('')}</table>
+    ${o.notas?`<div style="margin-top:8px;font-size:13px">📝 ${esc(o.notas)}</div>`:''}`;
+  document.getElementById('docView').classList.add('show');
+}
+async function cargarPedidosOran(){
+  const {data}=await db.from('cc_pedidos_oran').select('*').order('creado_en',{ascending:false}).limit(40);
+  const c=document.getElementById('listaOran');
+  if(!data||!data.length){c.innerHTML='<p class="muted">No hay pedidos a Orán.</p>';return;}
+  window._PO={}; data.forEach(o=>_PO[o.id]=o);
+  c.innerHTML=data.map(o=>`<div class="mov"><div class="top"><span class="cc">🚚 ${esc(o.nro||'')} · ${esc(o.cliente||'')}</span>${o.estado==='recibido'?'<span class="pill">Recibido</span>':'<span class="pill warn">Pedido</span>'}</div>
+    <div class="dt">${new Date(o.fecha+'T00:00').toLocaleDateString('es-AR')}${o.recibido_en?' · recibido '+new Date(o.recibido_en+'T00:00').toLocaleDateString('es-AR'):''}</div>
+    <div class="dt" style="color:#999">${(o.items||[]).map(i=>`${fmtN(i.cant)} ${esc(i.producto)}`).join(' · ')}</div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn gray" style="margin:0;padding:7px 10px;font-size:12px;width:auto" onclick="verPedidoOran(_PO[${o.id}])">📄 PDF</button>
+      ${o.estado!=='recibido'?`<button class="btn" style="margin:0;padding:7px 10px;font-size:12px;width:auto" onclick="recibirOran(${o.id})">✓ Recibido</button>`:''}
+    </div></div>`).join('');
+}
+async function recibirOran(id){
+  if(!confirm('¿Llegó la mercadería de este pedido? Queda lista para entregar al cliente (se concreta desde "Pedidos de clientes").'))return;
+  await db.from('cc_pedidos_oran').update({estado:'recibido',recibido_en:hoy()}).eq('id',id); toast('Marcado como recibido ✓'); cargarPedidosOran();
 }
 
 // ================= PEDIDOS =================
