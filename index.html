@@ -97,6 +97,15 @@
     <input id="login-pass" type="password" autocomplete="current-password" required>
     <button class="btn" id="login-btn" type="submit">Entrar</button>
     <div id="loginErr"></div>
+    <div style="text-align:center;margin-top:12px"><a href="#" onclick="event.preventDefault();olvide()" style="color:var(--verde);font-size:14px;font-weight:600">¿Olvidaste la contraseña?</a></div>
+  </form>
+  <form class="card hidden" id="nuevaPassForm" onsubmit="event.preventDefault();guardarNuevaPass()">
+    <h2 class="tt">Nueva contraseña</h2>
+    <div class="muted">Elegí una contraseña nueva (mínimo 8 caracteres).</div>
+    <label for="np-1">Contraseña nueva</label><input id="np-1" type="password" autocomplete="new-password" required minlength="8">
+    <label for="np-2">Repetila</label><input id="np-2" type="password" autocomplete="new-password" required minlength="8">
+    <button class="btn" type="submit">Guardar contraseña</button>
+    <div id="npErr" style="color:var(--rojo);font-size:13px;margin-top:10px"></div>
   </form>
 </div>
 <header><h1>Cuenta Corriente</h1><div class="sub">Don Antonio S.R.L. · Suc. Jujuy · Agencia de Desarrollo</div><span class="salir" onclick="salir()">Salir</span></header>
@@ -1627,7 +1636,34 @@ async function salir(){
   if(!confirm('¿Cerrar sesión en este dispositivo?'))return;
   await db.auth.signOut(); location.reload();
 }
-db.auth.getSession().then(({data})=>{ if(data&&data.session)arrancar(); });
+const APP_URL=location.origin+location.pathname;
+let RECUPERANDO=/type=recovery/.test(location.hash);
+async function olvide(){
+  const mail=document.getElementById('login-mail').value.trim(), err=document.getElementById('loginErr');
+  if(!mail){err.textContent='Escribí tu mail arriba y tocá de nuevo "¿Olvidaste la contraseña?".';return;}
+  const {error}=await db.auth.resetPasswordForEmail(mail,{redirectTo:APP_URL});
+  err.style.color=error?'':'var(--verde)';
+  err.textContent=error?'No se pudo enviar: '+error.message:'Listo: te mandamos un mail con un enlace. Abrilo desde este mismo dispositivo para elegir la contraseña nueva.';
+}
+function mostrarNuevaPass(){
+  document.querySelector('#loginView form').classList.add('hidden');
+  document.getElementById('nuevaPassForm').classList.remove('hidden');
+  document.getElementById('loginView').classList.remove('hidden');
+}
+async function guardarNuevaPass(){
+  const a=document.getElementById('np-1').value, b=document.getElementById('np-2').value, err=document.getElementById('npErr');
+  if(a.length<8){err.textContent='Tiene que tener al menos 8 caracteres.';return;}
+  if(a!==b){err.textContent='Las dos contraseñas no coinciden.';return;}
+  const {error}=await db.auth.updateUser({password:a});
+  if(error){err.textContent='No se pudo guardar: '+error.message;return;}
+  ['np-1','np-2'].forEach(i=>document.getElementById(i).value='');
+  RECUPERANDO=false; history.replaceState(null,'',APP_URL);
+  document.getElementById('nuevaPassForm').classList.add('hidden');
+  document.querySelector('#loginView form').classList.remove('hidden');
+  toast('Contraseña nueva guardada ✓'); arrancar();
+}
+db.auth.onAuthStateChange((ev)=>{ if(ev==='PASSWORD_RECOVERY'){RECUPERANDO=true;mostrarNuevaPass();} });
+db.auth.getSession().then(({data})=>{ if(RECUPERANDO){mostrarNuevaPass();return;} if(data&&data.session)arrancar(); });
 </script>
 </body>
 </html>
